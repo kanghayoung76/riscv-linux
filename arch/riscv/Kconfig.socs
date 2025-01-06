@@ -1,5 +1,13 @@
 menu "SoC selection"
 
+config ARCH_ESWIN
+	bool "ESWIN EIC770x SoCs"
+	help
+	  This enables support for ESWIN EIC770X SoC platform hardware.
+	  Initially, this will enable the support for ESWIN EIC7700 SoC
+	  which consists of SiFive Quad-Core P550 64-bit Out-of-Order
+	  CPU cluster.
+
 config ARCH_MICROCHIP_POLARFIRE
 	def_bool ARCH_MICROCHIP
 
