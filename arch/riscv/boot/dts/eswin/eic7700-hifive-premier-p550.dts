@@ -1,0 +1,45 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/*
+ * Device Tree file for Eswin EIC7700 SoC.
+ *
+ * Copyright (c) 2024, Beijing ESWIN Computing Technology Co., Ltd.
+ */
+
+/dts-v1/;
+
+#define RTCCLK_FREQ		1000000
+#define LSPCLK_FREQ		200000000
+
+#include "eic7700.dtsi"
+
+/ {
+	#address-cells = <2>;
+	#size-cells = <2>;
+	model = "SiFive HiFive Premier P550";
+	compatible = "sifive,hifive-premier-p550", "eswin,eic7700";
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	cpus {
+		timebase-frequency = <RTCCLK_FREQ>;
+	};
+
+	memory@80000000 {
+		device_type = "memory";
+		reg = <0x0 0x80000000 0x7f 0x80000000>;
+	};
+};
+
+&uart0 {
+	status = "okay";
+};
+
+&uart2 {
+	status = "okay";
+};
+
+&gpio0 {
+	status = "okay";
+};
