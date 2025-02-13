@@ -47,6 +47,10 @@ properties:
           - const: microchip,mpfs-ccache
           - const: sifive,fu540-c000-ccache
           - const: cache
+      - items:
+          - const: eswin,eic7700-l3-cache
+          - const: sifive,ccache0
+          - const: cache
 
   cache-block-size:
     const: 64
@@ -55,10 +59,10 @@ properties:
     enum: [2, 3]
 
   cache-sets:
-    enum: [1024, 2048]
+    enum: [1024, 2048, 4096]
 
   cache-size:
-    const: 2097152
+    enum: [2097152, 4194304]
 
   cache-unified: true
 
@@ -93,6 +97,7 @@ allOf:
               - starfive,jh7100-ccache
               - starfive,jh7110-ccache
               - microchip,mpfs-ccache
+              - eswin,eic7700-l3-cache
 
     then:
       properties:
@@ -125,7 +130,7 @@ allOf:
     else:
       properties:
         cache-sets:
-          const: 1024
+          enum: [1024, 4096]
 
   - if:
       properties:
