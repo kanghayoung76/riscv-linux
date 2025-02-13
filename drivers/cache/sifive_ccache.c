@@ -120,6 +120,7 @@ static void ccache_config_read(void)
 static const struct of_device_id sifive_ccache_ids[] = {
 	{ .compatible = "sifive,fu540-c000-ccache" },
 	{ .compatible = "sifive,fu740-c000-ccache" },
+	{ .compatible = "eswin,eic7700-l3-cache" },
 	{ .compatible = "starfive,jh7100-ccache",
 	  .data = (void *)(QUIRK_NONSTANDARD_CACHE_OPS | QUIRK_BROKEN_DATA_UNCORR) },
 	{ .compatible = "sifive,ccache0" },
