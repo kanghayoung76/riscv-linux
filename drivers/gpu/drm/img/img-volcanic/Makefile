@@ -72,7 +72,7 @@ PVR_SERVICES_DEBUG=1
 WINDOW_SYSTEM=nulldrmws
 
 #include $(OUT)/config_kernel.mk
-include $(srctree)/$(src)/config_kernel.mk
+include $(src)/config_kernel.mk
 
 # Use the logic from kernel's Kbuild.include to select .NOTINTERMEDIATE or .SECONDARY based on make version
 ifneq ($(and $(filter notintermediate, $(.FEATURES)),$(filter-out 4.4,$(MAKE_VERSION))),)
@@ -101,16 +101,16 @@ bridge_base := $(BRIDGE_SOURCE_ROOT)
 #ccflags-y += -D__linux__ -include $(OUT)/config_kernel.h \
 # -include kernel_config_compatibility.h \
 # -I$(OUT)/include -I$(TOP)/kernel/drivers/staging/imgtec
-ccflags-y += -D__linux__ -include $(srctree)/$(src)/config_kernel.h \
+ccflags-y += -D__linux__ -include $(src)/config_kernel.h \
  -include $(srctree)/drivers/gpu/drm/img/kernel_config_compatibility.h \
  -I$(srctree)/drivers/gpu/drm/img \
- -I$(srctree)/$(src)/hwdefs/volcanic \
- -I$(srctree)/$(src)/hwdefs/volcanic/km \
- -I$(srctree)/$(src)/include/system/rgx_tc \
- -I$(srctree)/$(src)/include/volcanic/system/rgx_tc
+ -I$(src)/hwdefs/volcanic \
+ -I$(src)/hwdefs/volcanic/km \
+ -I$(src)/include/system/rgx_tc \
+ -I$(src)/include/volcanic/system/rgx_tc
 
-include $(srctree)/$(src)/services/server/env/linux/Kbuild.mk
-include $(srctree)/$(src)/services/system/eswin_cpu/Kbuild.mk
+include $(src)/services/server/env/linux/Kbuild.mk
+include $(src)/services/system/eswin_cpu/Kbuild.mk
 
 #include $(INTERNAL_KBUILD_MAKEFILES)
 
