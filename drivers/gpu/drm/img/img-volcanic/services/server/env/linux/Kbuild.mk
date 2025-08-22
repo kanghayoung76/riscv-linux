@@ -54,7 +54,6 @@ ccflags-y += -DWINDOW_SYSTEM=\"$(WINDOW_SYSTEM)\"
 # Linux kernel headers
 ccflags-y += \
  -Iinclude \
- -Iinclude/drm
 
 # Linux-specific headers
 ccflags-y += \
