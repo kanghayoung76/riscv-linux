@@ -64,23 +64,23 @@ void __init genesis_zone_set_readonly(void)
 	int numpages;
 	int ret;
 
-	base = (unsigned long)__va((max_low_pfn - GENESIS_ZONE_SZ) << PAGE_SHIFT);
-	numpages = GENESIS_ZONE_SZ;
+	base = (unsigned long)__va(0x100000000);
+	numpages = GENESIS_ZONE_SZ + DITO_ZONE_SZ;
 
 #if (GENESIS_DEBUG)
 	pr_info("[GENESIS] Mark GENESIS_ZONE as read-only "
 		"0x%lx - 0x%lx\n", base, base + (numpages << PAGE_SHIFT));
 #endif
 
-	ret = set_memory_ro(base, numpages);
+	ret = set_memory_rw(base, numpages);
 	if (ret)
 		panic("[GENESIS] failed to mark readonly!");
 }
 
 void __init genesis_init(void)
 {
-	//pr_info("[GENESIS] TEXT BEGIN: %px, END: %px\n", __genesis_text_begin,
-//					       __genesis_text_end);
+	pr_info("[GENESIS] TEXT BEGIN: %px, END: %px\n", __genesis_text_begin,
+					       __genesis_text_end);
 
 #if (GENESIS_DEBUG)
 	genesis_test();
@@ -93,5 +93,5 @@ void __init genesis_init(void)
 
 	genesis_enabled = 1;
 
-	//genesis_zone_set_readonly();
+	genesis_zone_set_readonly();
 }

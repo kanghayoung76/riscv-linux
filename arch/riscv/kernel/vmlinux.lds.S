@@ -27,6 +27,29 @@ ENTRY(_start)
 
 jiffies = jiffies_64;
 
+PECOFF_SECTION_ALIGNMENT = 0x1000;
+PECOFF_FILE_ALIGNMENT = 0x200;
+
+#ifdef CONFIG_GENESIS
+#define PRIVINST_TEXT                   \
+        . = ALIGN(SECTION_ALIGN);       \
+        __privinst_begin = .;           \
+        *(.text.privinst)               \
+        __privinst_end = .;             \
+        . = ALIGN(SECTION_ALIGN);
+
+#define GENESIS_TEXT                    \
+        ALIGN_FUNCTION();               \
+        __genesis_text_begin = .;       \
+        *(.genesis.text)                \
+        __genesis_text_end = .;
+
+#else
+#define PRIVINST_TEXT
+#define GENESIS_TEXT
+#endif
+
+
 SECTIONS
 {
 	/* Beginning of code and text segment */
@@ -45,6 +68,8 @@ SECTIONS
 		ENTRY_TEXT
 		IRQENTRY_TEXT
 		SOFTIRQENTRY_TEXT
+                GENESIS_TEXT
+                PRIVINST_TEXT
 		_etext = .;
 	}
 

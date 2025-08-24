@@ -1364,8 +1364,7 @@ static void __init setup_vm_final(void)
 
         pr_info("[GENESIS] Open GENESIS_ZONE to memblock \n");
         prev_memblock_current_limit = memblock_get_current_limit();
-	pr_info("[GENESIS] prev_memblock_current_limit = %llu\n", prev_memblock_current_limit);
-        //memblock_set_current_limit(MEMBLOCK_ALLOC_ANYWHERE);
+        memblock_set_current_limit(MEMBLOCK_ALLOC_ANYWHERE);
 #endif
 #if !defined(CONFIG_64BIT)
 	/*
@@ -1404,7 +1403,7 @@ static void __init setup_vm_final(void)
 
 #ifdef CONFIG_GENESIS
         pr_info("[GENESIS] Close GENESIS_ZONE to memblock!\n");
-        //memblock_set_current_limit(prev_memblock_current_limit);
+        memblock_set_current_limit(prev_memblock_current_limit);
 #endif
 
 	pt_ops_set_late();
