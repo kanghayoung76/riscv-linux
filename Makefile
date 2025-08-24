@@ -2,7 +2,7 @@
 VERSION = 6
 PATCHLEVEL = 12
 SUBLEVEL = 33
-EXTRAVERSION = -baseshadow
+EXTRAVERSION = -genesis
 NAME = Baby Opossum Posse
 
 # *DOCUMENTATION*

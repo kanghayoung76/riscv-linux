@@ -201,6 +201,17 @@ extern struct pt_alloc_ops pt_ops __meminitdata;
 #define _PAGE_IOREMAP	((_PAGE_KERNEL & ~_PAGE_MTMASK) | _PAGE_IO)
 #define PAGE_KERNEL_IO		__pgprot(_PAGE_IOREMAP)
 
+#ifdef CONFIG_GENESIS
+#define _PAGE_SHADOW            (_PAGE_USER \
+                                | _PAGE_READ \
+                                | _PAGE_WRITE \
+                                | _PAGE_PRESENT \
+                                | _PAGE_ACCESSED \
+                                | _PAGE_DIRTY)
+
+#define PAGE_SHADOW             __pgprot(_PAGE_SHADOW)
+#endif
+
 /* Set of bits to preserve across pte_modify() */
 #define _PAGE_CHG_MASK  (~(unsigned long)(_PAGE_PRESENT | _PAGE_READ |	\
 					  _PAGE_WRITE | _PAGE_EXEC |	\

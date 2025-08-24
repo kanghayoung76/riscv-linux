@@ -742,6 +742,10 @@ enum zone_type {
 	 * performed on pages in ZONE_NORMAL if the DMA devices support
 	 * transfers to all addressable memory.
 	 */
+#ifdef CONFIG_GENESIS
+        ZONE_DITO,
+        ZONE_GENESIS,
+#endif
 	ZONE_NORMAL,
 #ifdef CONFIG_HIGHMEM
 	/*

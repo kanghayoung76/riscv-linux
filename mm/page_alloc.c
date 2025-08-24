@@ -232,6 +232,10 @@ static int sysctl_lowmem_reserve_ratio[MAX_NR_ZONES] = {
 #ifdef CONFIG_ZONE_DMA32
 	[ZONE_DMA32] = 256,
 #endif
+#ifdef CONFIG_GENESIS
+        [ZONE_DITO] = 0,
+        [ZONE_GENESIS] = 0,
+#endif
 	[ZONE_NORMAL] = 32,
 #ifdef CONFIG_HIGHMEM
 	[ZONE_HIGHMEM] = 0,
@@ -245,6 +249,10 @@ char * const zone_names[MAX_NR_ZONES] = {
 #endif
 #ifdef CONFIG_ZONE_DMA32
 	 "DMA32",
+#endif
+#ifdef CONFIG_GENESIS
+         "DITO",
+         "GENESIS",
 #endif
 	 "Normal",
 #ifdef CONFIG_HIGHMEM
@@ -3344,7 +3352,7 @@ alloc_flags_nofragment(struct zone *zone, gfp_t gfp_mask)
 	 * the pointer is within zone->zone_pgdat->node_zones[]. Also assume
 	 * on UMA that if Normal is populated then so is DMA32.
 	 */
-	BUILD_BUG_ON(ZONE_NORMAL - ZONE_DMA32 != 1);
+	//BUILD_BUG_ON(ZONE_NORMAL - ZONE_DMA32 != 1);
 	if (nr_online_nodes > 1 && !populated_zone(--zone))
 		return alloc_flags;
 

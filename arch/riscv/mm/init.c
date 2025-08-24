@@ -36,6 +36,8 @@
 #include <asm/sparsemem.h>
 #include <asm/tlbflush.h>
 
+#include <asm/genesis.h>
+
 #include "../kernel/head.h"
 
 u64 new_vmalloc[NR_CPUS / sizeof(u64) + 1];
@@ -79,13 +81,30 @@ void *_dtb_early_va __initdata;
 uintptr_t _dtb_early_pa __initdata;
 
 phys_addr_t dma32_phys_limit __initdata;
+#ifdef CONFIG_GENESIS
+phys_addr_t dito_phys_limit __initdata = 0x140000000ULL;
+phys_addr_t genesis_phys_limit __initdata = 0x180000000ULL;
+#endif
 
 static void __init zone_sizes_init(void)
 {
 	unsigned long max_zone_pfns[MAX_NR_ZONES] = { 0, };
+#ifdef CONFIG_GENESIS
+#if (GENESIS_DEBUG)
+        pr_info("[GENESIS] dma32_phys_limit: %llx\n", dma32_phys_limit);
+        pr_info("[GENESIS] dito_phys_limit: %llx\n", dito_phys_limit);
+        pr_info("[GENESIS] genesis_phys_limit: %llx\n", genesis_phys_limit);
+        pr_info("[GENESIS] max_low_pfn: %lx \n", max_low_pfn);
+#endif
+#endif
+
 
 #ifdef CONFIG_ZONE_DMA32
 	max_zone_pfns[ZONE_DMA32] = PFN_DOWN(dma32_phys_limit);
+#endif
+#ifdef CONFIG_GENESIS
+	max_zone_pfns[ZONE_DITO] = PFN_DOWN(dito_phys_limit);
+	max_zone_pfns[ZONE_GENESIS] = PFN_DOWN(genesis_phys_limit);
 #endif
 	max_zone_pfns[ZONE_NORMAL] = max_low_pfn;
 
@@ -1262,6 +1281,7 @@ static void __meminit create_linear_mapping_range(phys_addr_t start, phys_addr_t
 {
 	phys_addr_t pa;
 	uintptr_t va, map_size;
+	uintptr_t shadow_va;
 
 	for (pa = start; pa < end; pa += map_size) {
 		va = (uintptr_t)__va(pa);
@@ -1270,6 +1290,13 @@ static void __meminit create_linear_mapping_range(phys_addr_t start, phys_addr_t
 
 		create_pgd_mapping(swapper_pg_dir, va, pa, map_size,
 				   pgprot ? *pgprot : pgprot_from_va(va));
+#ifdef CONFIG_GENESIS
+                        shadow_va = (uintptr_t)__virt_to_shadow(va);
+                        //pr_info("va: %lx pa: %llx\n", shadow_va, pa);
+                        create_pgd_mapping(swapper_pg_dir, shadow_va, pa,
+                                           map_size, PAGE_SHADOW);
+#endif
+
 	}
 }
 
@@ -1332,6 +1359,14 @@ static void __init create_linear_mapping_page_table(void)
 static void __init setup_vm_final(void)
 {
 	/* Setup swapper PGD for fixmap */
+#ifdef CONFIG_GENESIS
+        phys_addr_t prev_memblock_current_limit;
+
+        pr_info("[GENESIS] Open GENESIS_ZONE to memblock \n");
+        prev_memblock_current_limit = memblock_get_current_limit();
+	pr_info("[GENESIS] prev_memblock_current_limit = %llu\n", prev_memblock_current_limit);
+        //memblock_set_current_limit(MEMBLOCK_ALLOC_ANYWHERE);
+#endif
 #if !defined(CONFIG_64BIT)
 	/*
 	 * In 32-bit, the device tree lies in a pgd entry, so it must be copied
@@ -1366,6 +1401,11 @@ static void __init setup_vm_final(void)
 	/* Move to swapper page table */
 	csr_write(CSR_SATP, PFN_DOWN(__pa_symbol(swapper_pg_dir)) | satp_mode);
 	local_flush_tlb_all();
+
+#ifdef CONFIG_GENESIS
+        pr_info("[GENESIS] Close GENESIS_ZONE to memblock!\n");
+        //memblock_set_current_limit(prev_memblock_current_limit);
+#endif
 
 	pt_ops_set_late();
 }

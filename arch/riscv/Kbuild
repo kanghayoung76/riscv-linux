@@ -7,6 +7,8 @@ obj-y += errata/
 obj-$(CONFIG_KVM) += kvm/
 
 obj-$(CONFIG_ARCH_SUPPORTS_KEXEC_PURGATORY) += purgatory/
+obj-$(CONFIG_GENESIS) += genesis/
+
 
 # for cleaning
 subdir- += boot

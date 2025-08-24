@@ -58,6 +58,10 @@ enum {
 #ifdef CONFIG_SLAB_OBJ_EXT
 	___GFP_NO_OBJ_EXT_BIT,
 #endif
+#ifdef CONFIG_GENESIS
+        ___GFP_DITO_BIT,
+        ___GFP_GENESIS_BIT,
+#endif
 	___GFP_LAST_BIT
 };
 
@@ -103,6 +107,14 @@ enum {
 #else
 #define ___GFP_NO_OBJ_EXT       0
 #endif
+#ifdef CONFIG_GENESIS
+#define ___GFP_DITO             BIT(___GFP_DITO_BIT)
+#define ___GFP_GENESIS          BIT(___GFP_GENESIS_BIT)
+#else
+#define ___GFP_DITO             0
+#define ___GFP_GENESIS          0
+#endif
+
 
 /*
  * Physical address zone modifiers (see linux/mmzone.h - low four bits)
@@ -115,6 +127,8 @@ enum {
 #define __GFP_HIGHMEM	((__force gfp_t)___GFP_HIGHMEM)
 #define __GFP_DMA32	((__force gfp_t)___GFP_DMA32)
 #define __GFP_MOVABLE	((__force gfp_t)___GFP_MOVABLE)  /* ZONE_MOVABLE allowed */
+#define __GFP_DITO      ((__force gfp_t)___GFP_DITO)
+#define __GFP_GENESIS   ((__force gfp_t)___GFP_GENESIS)
 #define GFP_ZONEMASK	(__GFP_DMA|__GFP_HIGHMEM|__GFP_DMA32|__GFP_MOVABLE)
 
 /**
