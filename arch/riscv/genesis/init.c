@@ -47,7 +47,6 @@ void __init genesis_test(void)
 
 	pr_info("[GENESIS] TEST 2. SHADOW MAPPING ");
 	pr_info("addr: %px, shadow_addr: %lx\n", p3, __virt_to_shadow(p3));
-	/*
 	*p3 = 1234; // okay
 	shadow_p3 = (int *)__virt_to_shadow(p3);
 	__enable_user_access();
@@ -55,7 +54,6 @@ void __init genesis_test(void)
 	pr_info("addr val: %d, shadow val: %d\n", *p3, *shadow_p3);
 	__disable_user_access();
 	free_page((unsigned long int)p3);
-	*/
 
 	pr_info("[GENESIS] TEST CODE END\n");
 }
@@ -81,7 +79,7 @@ void __init genesis_zone_set_readonly(void)
 
 void __init genesis_init(void)
 {
-	//pr_info("TEXT BEGIN: %px, END: %px\n", __genesis_text_begin,
+	//pr_info("[GENESIS] TEXT BEGIN: %px, END: %px\n", __genesis_text_begin,
 //					       __genesis_text_end);
 
 #if (GENESIS_DEBUG)
