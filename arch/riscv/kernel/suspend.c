@@ -39,11 +39,23 @@ void suspend_restore_csrs(struct suspend_context *context)
 	csr_write(CSR_SCRATCH, 0);
 	if (riscv_cpu_has_extension_unlikely(smp_processor_id(), RISCV_ISA_EXT_XLINUXENVCFG))
 		csr_write(CSR_ENVCFG, context->envcfg);
+#ifndef CONFIG_GENESIS
 	csr_write(CSR_TVEC, context->tvec);
+#else
+        _genesis_entry(/*svc_num*/ GENESIS_WRITE_TVEC,
+                       /*arg0*/ context->tvec,
+                       /*arg1*/ 0);
+#endif
 	csr_write(CSR_IE, context->ie);
 
 #ifdef CONFIG_MMU
+#ifndef CONFIG_GENESIS
 	csr_write(CSR_SATP, context->satp);
+#else
+        _genesis_entry(/*svc_num*/ GENESIS_WRITE_SATP,
+                       /*arg0*/ context->satp,
+                       /*arg1*/ 0);
+#endif
 #endif
 }
 

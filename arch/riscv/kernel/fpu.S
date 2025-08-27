@@ -18,12 +18,25 @@
 #include <asm/asm.h>
 #include <asm/csr.h>
 #include <asm/asm-offsets.h>
+#include <asm/genesis.h>
 
 SYM_FUNC_START(__fstate_save)
 	li  a2,  TASK_THREAD_F0
 	add a0, a0, a2
+#ifndef CONFIG_GENESIS
 	li t1, SR_FS
 	csrs CSR_STATUS, t1
+#else
+        addi sp, sp, -2*SZREG   // Adjust sp
+        REG_S a0, (sp)          // Save a0
+        REG_S ra, SZREG(sp)     // Save ra
+        li a0, GENESIS_SET_CSR  // Set SVC number (SET_CSR)
+        li a1, SR_FS            // Set argument 0 (csr)
+        call _genesis_entry     // Jump to the inner kernel
+        REG_L ra, SZREG(sp)     // Restore ra
+        REG_L a0, (sp)          // Restore a0
+        addi sp, sp, 2*SZREG    // Adjust sp
+#endif
 	frcsr t0
 	fsd f0,  TASK_THREAD_F0_F0(a0)
 	fsd f1,  TASK_THREAD_F1_F0(a0)
@@ -58,6 +71,9 @@ SYM_FUNC_START(__fstate_save)
 	fsd f30, TASK_THREAD_F30_F0(a0)
 	fsd f31, TASK_THREAD_F31_F0(a0)
 	sw t0, TASK_THREAD_FCSR_F0(a0)
+#ifdef CONFIG_GENESIS
+        li t1, SR_FS
+#endif
 	csrc CSR_STATUS, t1
 	ret
 SYM_FUNC_END(__fstate_save)
@@ -65,9 +81,21 @@ SYM_FUNC_END(__fstate_save)
 SYM_FUNC_START(__fstate_restore)
 	li  a2,  TASK_THREAD_F0
 	add a0, a0, a2
-	li t1, SR_FS
 	lw t0, TASK_THREAD_FCSR_F0(a0)
+#ifndef CONFIG_GENESIS
+	li t1, SR_FS
 	csrs CSR_STATUS, t1
+#else
+        addi sp, sp, -2*SZREG   // Adjust sp
+        REG_S a0, (sp)          // Save a0
+        REG_S ra, SZREG(sp)     // Save ra
+        li a0, GENESIS_SET_CSR  // Set SVC number (SET_CSR)
+        li a1, SR_FS            // Set argument 0 (csr)
+        call _genesis_entry     // Jump to the inner kernel
+        REG_L ra, SZREG(sp)     // Restore ra
+        REG_L a0, (sp)          // Restore a0
+        addi sp, sp, 2*SZREG    // Adjust sp
+#endif
 	fld f0,  TASK_THREAD_F0_F0(a0)
 	fld f1,  TASK_THREAD_F1_F0(a0)
 	fld f2,  TASK_THREAD_F2_F0(a0)
@@ -101,6 +129,9 @@ SYM_FUNC_START(__fstate_restore)
 	fld f30, TASK_THREAD_F30_F0(a0)
 	fld f31, TASK_THREAD_F31_F0(a0)
 	fscsr t0
+#ifdef CONFIG_GENESIS
+	li t1, SR_FS
+#endif
 	csrc CSR_STATUS, t1
 	ret
 SYM_FUNC_END(__fstate_restore)
