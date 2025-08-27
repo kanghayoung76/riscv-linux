@@ -11,6 +11,13 @@
  * Functions to change memory attributes.
  */
 #ifdef CONFIG_MMU
+#ifdef CONFIG_GENESIS
+#include <linux/mm.h>
+#include <asm/page.h>
+int set_memory_u_ro(unsigned long addr, int numpages);
+int set_memory_u_rw(unsigned long addr, int numpages);
+int set_memory_u_x(unsigned long addr, int numpages);
+#endif
 int set_memory_ro(unsigned long addr, int numpages);
 int set_memory_rw(unsigned long addr, int numpages);
 int set_memory_x(unsigned long addr, int numpages);

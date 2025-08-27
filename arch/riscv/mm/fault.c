@@ -20,6 +20,9 @@
 #include <asm/ptrace.h>
 #include <asm/tlbflush.h>
 
+#include <linux/pagemap.h>
+#include <asm/genesis.h>
+
 #include "../kernel/head.h"
 
 static void die_kernel_fault(const char *msg, unsigned long addr,
@@ -220,6 +223,10 @@ static inline bool access_error(unsigned long cause, struct vm_area_struct *vma)
  * This routine handles page faults.  It determines the address and the
  * problem, and then passes it off to one of the appropriate routines.
  */
+
+/*JADU
+ * asmlinkage void do_page_fault(struct pt_regs *regs) in v5.1
+ */
 void handle_page_fault(struct pt_regs *regs)
 {
 	struct task_struct *tsk;
@@ -271,12 +278,21 @@ void handle_page_fault(struct pt_regs *regs)
 	if (user_mode(regs))
 		flags |= FAULT_FLAG_USER;
 
+#ifdef CONFIG_GENESIS
+        bool in_genesis(unsigned long addr);
+
+        if (!user_mode(regs) && addr < TASK_SIZE &&
+                        in_genesis(instruction_pointer(regs)))
+                die_kernel_fault("[GENESIS] Fault in the inner kernel\n",
+                                addr, regs);
+#else
 	if (!user_mode(regs) && addr < TASK_SIZE && unlikely(!(regs->status & SR_SUM))) {
 		if (fixup_exception(regs))
 			return;
 
 		die_kernel_fault("access to user memory without uaccess routines", addr, regs);
 	}
+#endif
 
 	perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS, 1, regs, addr);
 
@@ -381,3 +397,197 @@ done:
 	}
 	return;
 }
+
+#ifdef CONFIG_GENESIS
+
+#undef pr_fmt
+#define pr_fmt(fmt) "[GENESIS-FAULT-HANDLER] " fmt
+
+extern char __genesis_text_begin[], __genesis_text_end;
+
+inline bool in_genesis(unsigned long pc)
+{
+        if (pc >= (unsigned long)__genesis_text_begin
+            && pc < (unsigned long)__genesis_text_end)
+                return true;
+        return false;
+}
+
+static inline pte_t *lookup_pte(const struct mm_struct *mm,
+                                unsigned long addr)
+{
+        pgd_t *pgd;
+        p4d_t *p4d;
+        pud_t *pud;
+        pmd_t *pmd;
+
+        pgd = pgd_offset(mm, addr);
+        if (pgd_none(*pgd))
+                return NULL;
+
+        p4d = p4d_offset(pgd, addr);
+        if (p4d_none(*p4d))
+                return NULL;
+
+        pud = pud_offset(p4d, addr);
+        if (pud_none(*pud))
+                return NULL;
+
+        pmd = pmd_offset(pud, addr);
+        if (pmd_none(*pmd))
+                return NULL;
+
+        return pte_offset_map(pmd, addr);
+}
+
+/*
+static inline int is_cow(pte_t pte, unsigned long flags)
+{
+        if ((flags & VM_WRITE) && !pte_write(pte)) // read-only
+                return 1;
+        return 0;
+}
+
+static int preprocess_one_page_fault(unsigned long addr, bool is_write)
+{
+        struct task_struct *tsk;
+        struct vm_area_struct *vma;
+        struct mm_struct *mm;
+        unsigned int flags = FAULT_FLAG_DEFAULT;
+        unsigned long cause = EXC_LOAD_PAGE_FAULT;
+        vm_fault_t fault;
+        pte_t *ptep;
+
+        tsk = current;
+        mm = tsk->mm;
+
+        if (is_write) {
+                flags |= FAULT_FLAG_WRITE;
+                cause = EXC_STORE_PAGE_FAULT;
+        }
+
+        ptep = lookup_pte(mm, addr);
+        if (ptep && pte_present(*ptep)) {
+                if (!is_write)
+                        goto success;
+
+                mmap_read_lock(mm);
+                vma = find_vma(mm, addr);
+                if (unlikely(!vma)) {
+                        mmap_read_unlock(mm);
+                        pr_err("Considered as un attack!\n");
+                        BUG();
+                }
+
+                if (!is_cow_mapping(vma->vm_flags)) {
+                        mmap_read_unlock(mm);
+                        goto success;
+                }
+
+                goto good_area;
+        }
+
+retry:
+        mmap_read_lock(mm);
+
+        vma = find_vma(mm, addr);
+        if (unlikely(!vma)) {
+                pr_info("find_vma Failed (%lx)\n", addr);
+                mmap_read_unlock(mm);
+
+                goto fail;
+        }
+        if (likely(vma->vm_start <= addr))
+                goto good_area;
+        if (unlikely(!(vma->vm_flags & VM_GROWSDOWN))) {
+                pr_info("Not GROWSDOWN\n");
+                mmap_read_unlock(mm);
+                goto fail;
+        }
+	if (unlikely(expand_stack(vma, addr))) { 
+                pr_info("Expand_stack Failed\n");
+                mmap_read_unlock(mm);
+                goto fail;
+        }
+        *
+         * Ok, we have a good vm_area for this memory access, so
+         * we can handle it.
+         *
+good_area:
+        *
+         * If for any reason at all we could not handle the fault,
+         * make sure we exit gracefully rather than endlessly redo
+         * the fault.
+         *
+        fault = handle_mm_fault(vma, addr, flags, NULL);
+
+        if (unlikely(fault & VM_FAULT_RETRY)) {
+                flags |= FAULT_FLAG_TRIED;
+
+                *
+                 * No need to mmap_read_unlock(mm) as we would
+                 * have already released it in __lock_page_or_retry
+                 * in mm/filemap.c.
+                 *
+                goto retry;
+        }
+
+        mmap_read_unlock(mm);
+
+        if (unlikely(fault & VM_FAULT_ERROR)) {
+                pr_err("failed to handle a page fault!\n");
+                goto fail;
+        }
+
+success:
+        return 0;
+
+fail:
+#if (0)
+        current->thread.bad_cause = cause;
+        do_trap(task_pt_regs(current), SIGSEGV, SEGV_MAPERR, addr);
+        pr_info("Killed the bad process\n");
+#endif
+        pr_info("Failed to prepare a page fault (%d)\n", current->pid);
+
+        return -EFAULT;
+}
+
+int prepare_page_fault(void *to, const void *from, unsigned long len)
+{
+        void *tmp_to = (void *)ALIGN_DOWN((unsigned long)to, PAGE_SIZE);
+        void *tmp_from = (void *)ALIGN_DOWN((unsigned long)from, PAGE_SIZE);
+
+        if (to && (unsigned long)to < TASK_SIZE) { // if it is in user space
+                do {
+                        if (preprocess_one_page_fault((unsigned long)tmp_to,
+                                                  1)) {
+                                return -EFAULT;
+                        }
+
+                        tmp_to += PAGE_SIZE;
+                } while (tmp_to < to + len);
+        }
+
+        if (from && (unsigned long)from < TASK_SIZE) { // if it is in user space
+                do {
+                        if (preprocess_one_page_fault((unsigned long)tmp_from,
+                                                  0)) {
+                                return -EFAULT;
+                        }
+
+                        tmp_from += PAGE_SIZE;
+                } while (tmp_from < from + len);
+        }
+
+        return 0;
+}
+EXPORT_SYMBOL(prepare_page_fault);
+*/
+int prepare_page_fault(void *to, const void *from, unsigned long len)
+{
+    return 0;
+}
+EXPORT_SYMBOL_GPL(prepare_page_fault);
+#endif
+

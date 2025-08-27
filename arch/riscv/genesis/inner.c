@@ -1,6 +1,7 @@
 #include <asm/genesis.h>
 #include <asm/csr.h>
 #include <asm/pgtable.h>
+#include <asm/uaccess.h>
 
 /* PRIVILEGED INSTRUCTIONS */
 extern void _genesis_write_satp(unsigned long pgd);
@@ -190,9 +191,11 @@ unsigned long __genesis inner_handler(unsigned long svc_num,
 
 	/* COPY_FROM/TO_USER */
 	case GENESIS_COPY_USER:
-		return __genesis_asm_copy_user(arg0, arg1, arg2);
+		//return __genesis_asm_copy_user(arg0, arg1, arg2);
+		return __asm_copy_from_user((void __user *)arg0, (const void *)arg1, arg2);
 	case GENESIS_CLEAR_USER:
-		return __genesis_clear_user(arg0, arg1);
+		//return __genesis_clear_user(arg0, arg1);
+		return __clear_user((void __user *)arg0, arg1);
 
 	/* INIT PAGE TABLES  */
 	case GENESIS_INIT_PGD:

@@ -28,6 +28,33 @@
 #define __disable_user_access()							\
 	__asm__ __volatile__ ("csrc sstatus, %0" : : "r" (SR_SUM) : "memory")
 
+#define GENESIS_INTERCEPT_UACCESS 1 
+
+#if defined(CONFIG_GENESIS) && (GENESIS_INTERCEPT_UACCESS)
+/* Assume that user accessing functions such as get/put_uesrs
+ * always execute with interrupt enabled.
+ * */
+
+#define __asm_genesis_entry()                                   \
+        __asm__ __volatile__ (                                  \
+                "       csrr    t6, sstatus\n"                  \
+                "       csrc    sstatus, %[ie]\n"               \
+                "       li      t6, %[sum]\n"                   \
+                "       csrs    sstatus, t6\n"                  \
+                : 	                                        \
+                : [ie]"i" (SR_IE), [sum]"i" (SR_SUM)  		\
+                : "t6")
+#define __asm_genesis_exit()                                    \
+        __asm__ __volatile__ (                                  \
+                "       li      t6, %[sum]\n"                   \
+                "       csrc    sstatus, t6\n"                  \
+                "       csrs    sstatus, %[ie]\n"               \
+                : 		                                \
+                : [ie]"i" (SR_IE), [sum]"i" (SR_SUM)  		\
+                : "t6")
+#endif
+
+
 /*
  * The exception table consists of pairs of addresses: the first is the
  * address of an instruction that is allowed to fault, and the second is
@@ -108,6 +135,30 @@ do {								\
 	}							\
 } while (0)
 
+#if defined(CONFIG_GENESIS) && (GENESIS_INTERCEPT_UACCESS)
+#define __get_user_check(x, __gu_ptr, __gu_err)         \
+if ((unsigned long)__gu_ptr >= TASK_SIZE)                       \
+        BUG();                                                  \
+do {                                                            \
+        switch (sizeof(*__gu_ptr)) {                            \
+        case 1:                                                 \
+                __get_user_asm("lb", (x), __gu_ptr, __gu_err);  \
+                break;                                          \
+        case 2:                                                 \
+                __get_user_asm("lh", (x), __gu_ptr, __gu_err);  \
+                break;                                          \
+        case 4:                                                 \
+                __get_user_asm("lw", (x), __gu_ptr, __gu_err);  \
+                break;                                          \
+        case 8:                                                 \
+                __get_user_8((x), __gu_ptr, __gu_err);          \
+                break;                                          \
+        default:                                                \
+                BUILD_BUG();                                    \
+        }                                                       \
+} while (0)
+#endif
+
 /**
  * __get_user: - Get a simple variable from user space, with less checking.
  * @x:   Variable to store result.
@@ -128,20 +179,37 @@ do {								\
  * Returns zero on success, or -EFAULT on error.
  * On error, the variable @x is set to zero.
  */
-#define __get_user(x, ptr)					\
-({								\
-	const __typeof__(*(ptr)) __user *__gu_ptr = (ptr);	\
-	long __gu_err = 0;					\
-								\
-	__chk_user_ptr(__gu_ptr);				\
-								\
-	__enable_user_access();					\
-	__get_user_nocheck(x, __gu_ptr, __gu_err);		\
-	__disable_user_access();				\
-								\
-	__gu_err;						\
+#if !defined(CONFIG_GENESIS) || !(GENESIS_INTERCEPT_UACCESS)
+#define __get_user(x, ptr)                                      \
+({                                                              \
+        const __typeof__(*(ptr)) __user *__gu_ptr = (ptr);      \
+        long __gu_err = 0;                                      \
+                                                                \
+        __chk_user_ptr(__gu_ptr);                               \
+                                                                \
+        __enable_user_access();                                 \
+        __get_user_nocheck(x, __gu_ptr, __gu_err);              \
+        __disable_user_access();                                \
+                                                                \
+        __gu_err;                                               \
 })
-
+#else
+#define __get_user(x, ptr)                                      \
+({                                                              \
+        const __typeof__(*(ptr)) __user *__gu_ptr = (ptr);      \
+        long __gu_err = 0;                                      \
+                                                                \
+        __chk_user_ptr(__gu_ptr);                               \
+                                                                \
+        prepare_page_fault(0, __gu_ptr, sizeof(*__gu_ptr));     \
+                                                                \
+        __asm_genesis_entry();                                  \
+        __get_user_check(x, __gu_ptr, __gu_err);                \
+        __asm_genesis_exit();                                   \
+                                                                \
+        __gu_err;                                               \
+})
+#endif
 /**
  * get_user: - Get a simple variable from user space.
  * @x:   Variable to store result.
@@ -223,6 +291,31 @@ do {								\
 	}							\
 } while (0)
 
+#ifdef CONFIG_GENESIS
+#define __put_user_check(x, __gu_ptr, __pu_err)         \
+if ((unsigned long)__gu_ptr >= TASK_SIZE)                       \
+        BUG();                                                  \
+do {                                                            \
+        switch (sizeof(*__gu_ptr)) {                            \
+        case 1:                                                 \
+                __put_user_asm("sb", (x), __gu_ptr, __pu_err);  \
+                break;                                          \
+        case 2:                                                 \
+                __put_user_asm("sh", (x), __gu_ptr, __pu_err);  \
+                break;                                          \
+        case 4:                                                 \
+                __put_user_asm("sw", (x), __gu_ptr, __pu_err);  \
+                break;                                          \
+        case 8:                                                 \
+                __put_user_8((x), __gu_ptr, __pu_err);  \
+                break;                                          \
+        default:                                                \
+                BUILD_BUG();                                    \
+        }                                                       \
+} while (0)
+#endif
+
+
 /**
  * __put_user: - Write a simple value into user space, with less checking.
  * @x:   Value to copy to user space.
@@ -244,6 +337,7 @@ do {								\
  *
  * Returns zero on success, or -EFAULT on error.
  */
+#if !defined(CONFIG_GENESIS) || !(GENESIS_INTERCEPT_UACCESS)
 #define __put_user(x, ptr)					\
 ({								\
 	__typeof__(*(ptr)) __user *__gu_ptr = (ptr);		\
@@ -258,6 +352,25 @@ do {								\
 								\
 	__pu_err;						\
 })
+#else
+#define __put_user(x, ptr)                                      \
+({                                                              \
+        __typeof__(*(ptr)) __user *__gu_ptr = (ptr);            \
+        __typeof__(*__gu_ptr) __val = (x);                      \
+        long __pu_err = 0;                                      \
+                                                                \
+        __chk_user_ptr(__gu_ptr);                               \
+                                                                \
+        prepare_page_fault(__gu_ptr, 0, sizeof(*__gu_ptr));     \
+                                                                \
+        __asm_genesis_entry();                                  \
+        __put_user_check(__val, __gu_ptr, __pu_err);            \
+        __asm_genesis_exit();                                   \
+                                                                \
+        __pu_err;                                               \
+})
+#endif
+
 
 /**
  * put_user: - Write a simple value into user space.
@@ -290,16 +403,45 @@ unsigned long __must_check __asm_copy_to_user(void __user *to,
 unsigned long __must_check __asm_copy_from_user(void *to,
 	const void __user *from, unsigned long n);
 
+#ifdef CONFIG_GENESIS
+extern int prepare_page_fault(void *to, const void *from, unsigned long len);
+#endif
+
 static inline unsigned long
 raw_copy_from_user(void *to, const void __user *from, unsigned long n)
 {
-	return __asm_copy_from_user(to, from, n);
+#if !defined(CONFIG_GENESIS) || !(GENESIS_INTERCEPT_UACCESS)
+        return __asm_copy_from_user(to, from, n);
+#else
+        if (prepare_page_fault(to, from, n)) {
+                pr_info ("[GENESIS-UACCESS] Failed copy_from_user (%px, %px, %lx)\n",
+                         to, from, n);
+                return n;
+        }
+        return _genesis_uaccess_entry( GENESIS_COPY_USER,
+                                       (unsigned long)to,
+                                       (unsigned long)from,
+                                       n);
+#endif
 }
 
 static inline unsigned long
 raw_copy_to_user(void __user *to, const void *from, unsigned long n)
 {
-	return __asm_copy_to_user(to, from, n);
+#if !defined(CONFIG_GENESIS) || !(GENESIS_INTERCEPT_UACCESS)
+        return __asm_copy_to_user(to, from, n);
+#else
+        if (prepare_page_fault(to, from, n)) {
+                pr_info ("[GENESIS-UACCESS] Failed copy_from_user (%px, %px, %lx)\n",
+                         to, from, n);
+                return n;
+        }
+
+        return _genesis_uaccess_entry( GENESIS_COPY_USER,
+                                       (unsigned long)to,
+                                       (unsigned long)from,
+                                       n);
+#endif
 }
 
 extern long strncpy_from_user(char *dest, const char __user *src, long count);
@@ -312,9 +454,26 @@ unsigned long __must_check __clear_user(void __user *addr, unsigned long n);
 static inline
 unsigned long __must_check clear_user(void __user *to, unsigned long n)
 {
-	might_fault();
-	return access_ok(to, n) ?
-		__clear_user(to, n) : n;
+        might_fault();
+#if !defined(CONFIG_GENESIS) || !(GENESIS_INTERCEPT_UACCESS)
+        return access_ok(to, n) ?
+                __clear_user(to, n) : n;
+#else
+        if (access_ok(to, n)) {
+                if (prepare_page_fault(to, 0, n)) {
+                        pr_info ("[GENESIS-UACCESS] Failed clear_user (%px, %lx)\n",
+                                 to, n);
+                        return n;
+                }
+		
+                return _genesis_uaccess_entry(
+                                 GENESIS_CLEAR_USER,
+                                 (unsigned long)to,
+                                 n,
+                                 0);
+	}
+        return n;
+#endif
 }
 
 #define __get_kernel_nofault(dst, src, type, err_label)			\
