@@ -41,7 +41,13 @@ int ptep_test_and_clear_young(struct vm_area_struct *vma,
 {
 	if (!pte_young(ptep_get(ptep)))
 		return 0;
+#ifndef CONFIG_GENESIS
 	return test_and_clear_bit(_PAGE_ACCESSED_OFFSET, &pte_val(*ptep));
+#else
+        return _genesis_entry(/*svc*/ GENESIS_TEST_AND_CLEAR_YOUNG_PTE,
+                              /*arg0*/ (unsigned long)ptep,
+                              /*arg1*/ 0);
+#endif
 }
 EXPORT_SYMBOL_GPL(ptep_test_and_clear_young);
 

@@ -258,7 +258,13 @@ static inline bool pmd_leaf(pmd_t pmd)
 
 static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
 {
+#ifndef CONFIG_GENESIS
 	WRITE_ONCE(*pmdp, pmd);
+#else
+        _genesis_entry(/*svc_num*/ GENESIS_SET_PMD,
+                       /*arg0*/ (unsigned long)pmdp,
+                       /*arg1*/ pmd_val(pmd));
+#endif
 }
 
 static inline void pmd_clear(pmd_t *pmdp)
@@ -566,7 +572,13 @@ static inline int pte_same(pte_t pte_a, pte_t pte_b)
  */
 static inline void set_pte(pte_t *ptep, pte_t pteval)
 {
+#ifndef CONFIG_GENESIS
 	WRITE_ONCE(*ptep, pteval);
+#else
+        _genesis_entry(/*svc_num*/ GENESIS_SET_PTE,
+                       /*arg0*/ (unsigned long)ptep,
+                       /*arg1*/ pte_val(pteval));
+#endif
 }
 
 void flush_icache_pte(struct mm_struct *mm, pte_t pte);
@@ -613,7 +625,14 @@ extern int ptep_test_and_clear_young(struct vm_area_struct *vma, unsigned long a
 static inline pte_t ptep_get_and_clear(struct mm_struct *mm,
 				       unsigned long address, pte_t *ptep)
 {
+#ifndef CONFIG_GENESIS
 	pte_t pte = __pte(atomic_long_xchg((atomic_long_t *)ptep, 0));
+#else
+        pte_t pte;
+        pte = __pte(_genesis_entry(/*svc_num*/ GENESIS_GET_AND_CLEAR_PTE,
+                                   /*arg0*/ (unsigned long)ptep,
+                                   /*arg1*/ 0));
+#endif
 
 	page_table_check_pte_clear(mm, pte);
 
@@ -624,7 +643,13 @@ static inline pte_t ptep_get_and_clear(struct mm_struct *mm,
 static inline void ptep_set_wrprotect(struct mm_struct *mm,
 				      unsigned long address, pte_t *ptep)
 {
+#ifndef CONFIG_GENESIS
 	atomic_long_and(~(unsigned long)_PAGE_WRITE, (atomic_long_t *)ptep);
+#else
+        _genesis_entry(/*svc_num*/ GENESIS_SET_WRPROTECT_PTE,
+                       /*arg0*/ (unsigned long)ptep,
+                       /*arg1*/ 0);
+#endif
 }
 
 #define __HAVE_ARCH_PTEP_CLEAR_YOUNG_FLUSH
