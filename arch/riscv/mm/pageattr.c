@@ -374,6 +374,27 @@ int set_memory_nx(unsigned long addr, int numpages)
 	return __set_memory(addr, numpages, __pgprot(0), __pgprot(_PAGE_EXEC));
 }
 
+#ifdef CONFIG_GENESIS
+int set_memory_u_ro(unsigned long addr, int numpages)
+{
+        return __set_memory(addr, numpages, __pgprot(_PAGE_USER | _PAGE_READ),
+                            __pgprot(0));
+}
+
+int set_memory_u_rw(unsigned long addr, int numpages)
+{
+        return __set_memory(addr, numpages,
+                            __pgprot(_PAGE_USER | _PAGE_READ | _PAGE_WRITE),
+                            __pgprot(0));
+}
+
+int set_memory_u_x(unsigned long addr, int numpages)
+{
+        return __set_memory(addr, numpages, __pgprot(_PAGE_USER | _PAGE_EXEC),
+                            __pgprot(0));
+}
+#endif
+
 int set_direct_map_invalid_noflush(struct page *page)
 {
 	return __set_memory((unsigned long)page_address(page), 1,

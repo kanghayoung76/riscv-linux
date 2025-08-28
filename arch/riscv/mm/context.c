@@ -189,9 +189,16 @@ static void set_mm_asid(struct mm_struct *mm, unsigned int cpu)
 	raw_spin_unlock_irqrestore(&context_lock, flags);
 
 switch_mm_fast:
-	csr_write(CSR_SATP, virt_to_pfn(mm->pgd) |
-		  (cntx2asid(cntx) << SATP_ASID_SHIFT) |
-		  satp_mode);
+#ifndef CONFIG_GENESIS
+        csr_write(CSR_SATP, virt_to_pfn(mm->pgd) |
+                  (cntx2asid(cntx) << SATP_ASID_SHIFT) |
+                  satp_mode);
+#else
+        _genesis_entry(/*svc_num*/ GENESIS_WRITE_SATP,
+                       /*arg0*/ virt_to_pfn(mm->pgd) |
+                       (cntx2asid(cntx) << SATP_ASID_SHIFT) | satp_mode,
+                       /*arg1*/ 0);
+#endif
 
 	if (need_flush_tlb)
 		local_flush_tlb_all();
@@ -200,7 +207,13 @@ switch_mm_fast:
 static void set_mm_noasid(struct mm_struct *mm)
 {
 	/* Switch the page table and blindly nuke entire local TLB */
-	csr_write(CSR_SATP, virt_to_pfn(mm->pgd) | satp_mode);
+#ifndef CONFIG_GENESIS
+        csr_write(CSR_SATP, virt_to_pfn(mm->pgd) | satp_mode);
+#else
+        _genesis_entry(/*svc_num*/ GENESIS_WRITE_SATP,
+                       /*arg0*/ virt_to_pfn(mm->pgd) | satp_mode,
+                       /*arg1*/ 0);
+#endif
 	local_flush_tlb_all_asid(0);
 }
 
