@@ -35,9 +35,9 @@ static inline pte_t *__pte_alloc_one_kernel_noprof(struct mm_struct *mm)
         if (!ptdesc)
                 return NULL;
 	else
-                _genesis_entry(/*svc_num*/ GENESIS_INIT_PTE,
-                               /*arg0*/ (unsigned long)ptdesc_address(ptdesc),
-                               /*arg1*/ 0);
+                _genesis_entry(GENESIS_INIT_PTE,
+                               (unsigned long)ptdesc_address(ptdesc),
+                               0);
 
         return ptdesc_address(ptdesc);
 }
@@ -94,9 +94,9 @@ static inline pgtable_t __pte_alloc_one_noprof(struct mm_struct *mm, gfp_t gfp)
 	}
 
 #ifdef CONFIG_GENESIS
-        _genesis_entry(/*svc_num*/ GENESIS_INIT_PTE,
-                       /*arg0*/ (unsigned long)ptdesc_page(ptdesc),
-                       /*arg1*/ 0);
+        _genesis_entry(GENESIS_INIT_PTE,
+                       (unsigned long)ptdesc_address(ptdesc),
+                       0);
 #endif
 	return ptdesc_page(ptdesc);
 }
@@ -118,7 +118,6 @@ static inline pgtable_t pte_alloc_one_noprof(struct mm_struct *mm)
 #else
         return __pte_alloc_one_noprof(mm, (__GFP_GENESIS|__GFP_ACCOUNT));
 #endif
-
 }
 #define pte_alloc_one(...)	alloc_hooks(pte_alloc_one_noprof(__VA_ARGS__))
 #endif
@@ -188,9 +187,9 @@ static inline pmd_t *pmd_alloc_one_noprof(struct mm_struct *mm, unsigned long ad
                 pagetable_free(ptdesc);
                 return NULL;
         }
-        _genesis_entry(/*svc_num*/ GENESIS_INIT_PMD,
-                       /*arg0*/ (unsigned long)ptdesc_address(ptdesc),
-                       /*arg1*/ 0);
+        _genesis_entry(GENESIS_INIT_PMD,
+                       (unsigned long)ptdesc_address(ptdesc),
+                       0);
         return ptdesc_address(ptdesc);
 }
 #endif
@@ -244,9 +243,9 @@ static inline pud_t *__pud_alloc_one_noprof(struct mm_struct *mm, unsigned long 
         if (!ptdesc)
                 return NULL;
 	else
-                _genesis_entry(/*svc_num*/ GENESIS_INIT_PUD,
-                               /*arg0*/ (unsigned long)ptdesc_address(ptdesc),
-                               /*arg1*/ 0);
+                _genesis_entry(GENESIS_INIT_PUD,
+                               (unsigned long)ptdesc_address(ptdesc),
+                               0);
 
         pagetable_pud_ctor(ptdesc);
         return ptdesc_address(ptdesc);
