@@ -422,8 +422,11 @@ static inline phys_addr_t __init alloc_pte_fixmap(uintptr_t va)
 
 static phys_addr_t __meminit alloc_pte_late(uintptr_t va)
 {
+#ifdef CONFIG_GENESIS
+	struct ptdesc *ptdesc = pagetable_alloc(__GFP_GENESIS & ~__GFP_HIGHMEM, 0);
+#else
 	struct ptdesc *ptdesc = pagetable_alloc(GFP_KERNEL & ~__GFP_HIGHMEM, 0);
-
+#endif 
 	BUG_ON(!ptdesc || !pagetable_pte_ctor(ptdesc));
 	return __pa((pte_t *)ptdesc_address(ptdesc));
 }
@@ -436,7 +439,14 @@ static void __meminit create_pte_mapping(pte_t *ptep, uintptr_t va, phys_addr_t 
 	BUG_ON(sz != PAGE_SIZE);
 
 	if (pte_none(ptep[pte_idx]))
+#ifndef CONFIG_GENESIS
 		ptep[pte_idx] = pfn_pte(PFN_DOWN(pa), prot);
+#else
+                _genesis_entry(/*svc_num*/ GENESIS_SET_PTE,
+                               /*arg0*/ (unsigned long)&ptep[pte_idx],
+                               /*arg1*/ (unsigned long)pte_val(pfn_pte(PFN_DOWN(pa), prot)));
+#endif
+
 }
 
 #ifndef __PAGETABLE_PMD_FOLDED
@@ -502,8 +512,11 @@ static phys_addr_t __init alloc_pmd_fixmap(uintptr_t va)
 
 static phys_addr_t __meminit alloc_pmd_late(uintptr_t va)
 {
+#ifdef CONFIG_GENESIS
+	struct ptdesc *ptdesc = pagetable_alloc(__GFP_GENESIS & ~__GFP_HIGHMEM, 0);
+#else
 	struct ptdesc *ptdesc = pagetable_alloc(GFP_KERNEL & ~__GFP_HIGHMEM, 0);
-
+#endif
 	BUG_ON(!ptdesc || !pagetable_pmd_ctor(ptdesc));
 	return __pa((pmd_t *)ptdesc_address(ptdesc));
 }
@@ -518,15 +531,33 @@ static void __meminit create_pmd_mapping(pmd_t *pmdp,
 
 	if (sz == PMD_SIZE) {
 		if (pmd_none(pmdp[pmd_idx]))
-			pmdp[pmd_idx] = pfn_pmd(PFN_DOWN(pa), prot);
+#ifndef CONFIG_GENESIS
+                        pmdp[pmd_idx] = pfn_pmd(PFN_DOWN(pa), prot);
+#else
+                        _genesis_entry(/*svc_num*/ GENESIS_SET_PMD,
+                                       /*arg0*/ (unsigned long)&pmdp[pmd_idx],
+                                       /*arg1*/ (unsigned long)pmd_val(pfn_pmd(PFN_DOWN(pa), prot)));
+#endif
 		return;
 	}
 
 	if (pmd_none(pmdp[pmd_idx])) {
 		pte_phys = pt_ops.alloc_pte(va);
-		pmdp[pmd_idx] = pfn_pmd(PFN_DOWN(pte_phys), PAGE_TABLE);
+#ifndef CONFIG_GENESIS
+                pmdp[pmd_idx] = pfn_pmd(PFN_DOWN(pte_phys), PAGE_TABLE);
+#else
+                _genesis_entry(/*svc_num*/ GENESIS_SET_PMD,
+                               (unsigned long)&pmdp[pmd_idx],
+                               (unsigned long)pmd_val(pfn_pmd(PFN_DOWN(pte_phys), PAGE_TABLE)));
+#endif
 		ptep = pt_ops.get_pte_virt(pte_phys);
-		memset(ptep, 0, PAGE_SIZE);
+#ifndef CONFIG_GENESIS
+                memset(ptep, 0, PAGE_SIZE);
+#else
+                _genesis_entry(/*svc_num*/ GENESIS_INIT_PTE,
+                               /*arg0*/ (unsigned long)ptep,
+                               /*arg1*/ 0);
+#endif
 	} else {
 		pte_phys = PFN_PHYS(pmd_pfn(pmdp[pmd_idx]));
 		ptep = pt_ops.get_pte_virt(pte_phys);
@@ -568,7 +599,11 @@ static phys_addr_t __meminit alloc_pud_late(uintptr_t va)
 {
 	unsigned long vaddr;
 
+#ifdef CONFIG_GENESIS
+	vaddr = __get_free_page(__GFP_GENESIS);
+#else
 	vaddr = __get_free_page(GFP_KERNEL);
+#endif
 	BUG_ON(!vaddr);
 	return __pa(vaddr);
 }
@@ -606,7 +641,11 @@ static phys_addr_t __meminit alloc_p4d_late(uintptr_t va)
 {
 	unsigned long vaddr;
 
-	vaddr = __get_free_page(GFP_KERNEL);
+#ifdef CONFIG_GENESIS
+        vaddr = __get_free_page(__GFP_GENESIS);
+#else
+        vaddr = __get_free_page(GFP_KERNEL);
+#endif
 	BUG_ON(!vaddr);
 	return __pa(vaddr);
 }
@@ -620,15 +659,33 @@ static void __meminit create_pud_mapping(pud_t *pudp, uintptr_t va, phys_addr_t 
 
 	if (sz == PUD_SIZE) {
 		if (pud_val(pudp[pud_index]) == 0)
+#ifndef CONFIG_GENESIS
 			pudp[pud_index] = pfn_pud(PFN_DOWN(pa), prot);
+#else
+                        _genesis_entry(/*svc_num*/ GENESIS_SET_PUD,
+                                       /*arg0*/ (unsigned long)&pudp[pud_index],
+                                       /*arg1*/ (unsigned long)pud_val(pfn_pud(PFN_DOWN(pa), prot)));
+#endif
 		return;
 	}
 
 	if (pud_val(pudp[pud_index]) == 0) {
 		next_phys = pt_ops.alloc_pmd(va);
-		pudp[pud_index] = pfn_pud(PFN_DOWN(next_phys), PAGE_TABLE);
+#ifndef CONFIG_GENESIS
+                pudp[pud_index] = pfn_pud(PFN_DOWN(next_phys), PAGE_TABLE);
+#else
+                _genesis_entry(/*svc_num*/GENESIS_SET_PUD,
+                               (unsigned long)&pudp[pud_index],
+                               (unsigned long)pud_val(pfn_pud(PFN_DOWN(next_phys), PAGE_TABLE)));
+#endif
 		nextp = pt_ops.get_pmd_virt(next_phys);
-		memset(nextp, 0, PAGE_SIZE);
+#ifndef CONFIG_GENESIS
+                memset(nextp, 0, PAGE_SIZE);
+#else
+                _genesis_entry(/*svc_num*/ GENESIS_INIT_PMD,
+                               /*arg0*/ (unsigned long)nextp,
+                               /*arg1*/ 0);
+#endif
 	} else {
 		next_phys = PFN_PHYS(pud_pfn(pudp[pud_index]));
 		nextp = pt_ops.get_pmd_virt(next_phys);
@@ -646,15 +703,33 @@ static void __meminit create_p4d_mapping(p4d_t *p4dp, uintptr_t va, phys_addr_t 
 
 	if (sz == P4D_SIZE) {
 		if (p4d_val(p4dp[p4d_index]) == 0)
-			p4dp[p4d_index] = pfn_p4d(PFN_DOWN(pa), prot);
+#ifndef CONFIG_GENESIS
+                        p4dp[p4d_index] = pfn_p4d(PFN_DOWN(pa), prot);
+#else
+	                _genesis_entry(/*svc_num*/ GENESIS_SET_P4D,
+                               /*arg0*/ (unsigned long)&p4dp[p4d_index],
+                               /*arg1*/ (unsigned long)p4d_val(pfn_p4d(PFN_DOWN(pa), prot)));
+#endif
 		return;
 	}
 
 	if (p4d_val(p4dp[p4d_index]) == 0) {
 		next_phys = pt_ops.alloc_pud(va);
-		p4dp[p4d_index] = pfn_p4d(PFN_DOWN(next_phys), PAGE_TABLE);
+#ifndef CONFIG_GENESIS
+                p4dp[p4d_index] = pfn_p4d(PFN_DOWN(next_phys), PAGE_TABLE);
+#else
+                _genesis_entry(/*svc_num*/GENESIS_SET_P4D,
+                               (unsigned long)&p4dp[p4d_index],
+                               (unsigned long)p4d_val(pfn_p4d(PFN_DOWN(next_phys), PAGE_TABLE)));
+#endif
 		nextp = pt_ops.get_pud_virt(next_phys);
-		memset(nextp, 0, PAGE_SIZE);
+#ifndef CONFIG_GENESIS
+                memset(nextp, 0, PAGE_SIZE);
+#else
+                _genesis_entry(/*svc_num*/ GENESIS_INIT_PUD,
+                               /*arg0*/ (unsigned long)nextp,
+                               /*arg1*/ 0);
+#endif
 	} else {
 		next_phys = PFN_PHYS(p4d_pfn(p4dp[p4d_index]));
 		nextp = pt_ops.get_pud_virt(next_phys);
@@ -703,15 +778,33 @@ void __meminit create_pgd_mapping(pgd_t *pgdp, uintptr_t va, phys_addr_t pa, phy
 
 	if (sz == PGDIR_SIZE) {
 		if (pgd_val(pgdp[pgd_idx]) == 0)
-			pgdp[pgd_idx] = pfn_pgd(PFN_DOWN(pa), prot);
+#ifndef CONFIG_GENESIS
+                        pgdp[pgd_idx] = pfn_pgd(PFN_DOWN(pa), prot);
+#else
+                        _genesis_entry(/*svc_num*/ GENESIS_SET_PGD,
+                                       /*arg0*/ (unsigned long)&pgdp[pgd_idx],
+                                       /*arg1*/ (unsigned long)pgd_val(pfn_pgd(PFN_DOWN(pa), prot)));
+#endif
 		return;
 	}
 
 	if (pgd_val(pgdp[pgd_idx]) == 0) {
 		next_phys = alloc_pgd_next(va);
-		pgdp[pgd_idx] = pfn_pgd(PFN_DOWN(next_phys), PAGE_TABLE);
+#ifndef CONFIG_GENESIS
+                pgdp[pgd_idx] = pfn_pgd(PFN_DOWN(next_phys), PAGE_TABLE);
+#else
+                _genesis_entry(GENESIS_SET_PGD,
+                               (unsigned long)&pgdp[pgd_idx],
+                               (unsigned long)pgd_val(pfn_pgd(PFN_DOWN(next_phys), PAGE_TABLE)));
+#endif
 		nextp = get_pgd_next_virt(next_phys);
-		memset(nextp, 0, PAGE_SIZE);
+#ifndef CONFIG_GENESIS
+                memset(nextp, 0, PAGE_SIZE);
+#else
+                _genesis_entry(/*svc_num*/ GENESIS_INIT_P4D,
+                               /*arg0*/ (unsigned long)nextp,
+                               /*arg1*/ 0);
+#endif
 	} else {
 		next_phys = PFN_PHYS(pgd_pfn(pgdp[pgd_idx]));
 		nextp = get_pgd_next_virt(next_phys);

@@ -12,6 +12,7 @@
 
 #include <linux/pgtable.h>
 #include <asm/kasan.h>
+#include <asm/genesis.h>
 
 #define pt_dump_seq_printf(m, fmt, args...)	\
 ({						\
@@ -78,6 +79,9 @@ enum address_markers_idx {
 	MODULES_MAPPING_NR,
 	KERNEL_MAPPING_NR,
 #endif
+#ifdef CONFIG_GENESIS
+        SHADOW_MAPPING_NR,
+#endif
 	END_OF_SPACE_NR
 };
 
@@ -100,6 +104,9 @@ static struct addr_marker address_markers[] = {
 #ifdef CONFIG_64BIT
 	{0, "Modules/BPF mapping"},
 	{0, "Kernel mapping"},
+#endif
+#ifdef CONFIG_GENESIS
+        {0, "Shadow mapping"},
 #endif
 	{-1, NULL},
 };
@@ -407,6 +414,9 @@ static int __init ptdump_init(void)
 #ifdef CONFIG_64BIT
 	address_markers[MODULES_MAPPING_NR].start_address = MODULES_VADDR;
 	address_markers[KERNEL_MAPPING_NR].start_address = kernel_map.virt_addr;
+#endif
+#ifdef CONFIG_GENESIS
+        address_markers[SHADOW_MAPPING_NR].start_address = SHADOW_OFFSET;
 #endif
 
 	kernel_ptd_info.base_addr = KERN_VIRT_START;
