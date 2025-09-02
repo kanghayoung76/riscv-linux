@@ -21,9 +21,10 @@ static inline void _genesis_set_pgd(pgd_t *pgdp, pgd_t pgd)
 {
 	pgd_t *spgdp;
 
-	if (likely(genesis_enabled))
+	if (likely(genesis_enabled)){
+		spgdp = (pgd_t *)__virt_to_shadow(pgdp);
 		spgdp = pgdp;
-		//spgdp = (pgd_t *)__virt_to_shadow(pgdp);
+	}
 	else
 		spgdp = pgdp;
 
@@ -34,9 +35,10 @@ static inline void _genesis_set_p4d(p4d_t *p4dp, p4d_t p4d)
 {
 	p4d_t *sp4dp;
 
-	if (likely(genesis_enabled))
+	if (likely(genesis_enabled)){
+		sp4dp = (p4d_t *)__virt_to_shadow(p4dp);
 		sp4dp = p4dp;
-		//sp4dp = (p4d_t *)__virt_to_shadow(p4dp);
+	}
 	else
 		sp4dp = p4dp;
 
@@ -47,9 +49,10 @@ static inline void _genesis_set_pud(pud_t *pudp, pud_t pud)
 {
 	pud_t *spudp;
 
-	if (likely(genesis_enabled))
+	if (likely(genesis_enabled)){
+		spudp = (pud_t *)__virt_to_shadow(pudp);
 		spudp = pudp;
-		//spudp = (pud_t *)__virt_to_shadow(pudp);
+	}
 	else
 		spudp = pudp;
 
@@ -60,9 +63,10 @@ static inline void _genesis_set_pmd(pmd_t *pmdp, pmd_t pmd)
 {
 	pmd_t *spmdp;
 
-	if (likely(genesis_enabled))
+	if (likely(genesis_enabled)){
+		spmdp = (pmd_t *)__virt_to_shadow(pmdp);
 		spmdp = pmdp;
-		//spmdp = (pmd_t *)__virt_to_shadow(pmdp);
+	}
 	else
 		spmdp = pmdp;
 
@@ -139,9 +143,10 @@ static void __genesis __genesis_init_pgtbl(void *pgtbl)
 {
 	void *shadow_pgtbl;
 
-	if (likely(genesis_enabled))
+	if (likely(genesis_enabled)){
+		shadow_pgtbl = (void *)__virt_to_shadow(pgtbl);
 		shadow_pgtbl = pgtbl;
-		//shadow_pgtbl = (void *)__virt_to_shadow(pgtbl);
+	}
 	else
 		shadow_pgtbl = pgtbl;
 

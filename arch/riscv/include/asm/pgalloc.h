@@ -116,6 +116,7 @@ static inline void __pud_free_tlb(struct mmu_gather *tlb, pud_t *pud,
 }
 
 #define p4d_alloc_one p4d_alloc_one
+#ifndef CONFIG_GENESIS
 static inline p4d_t *p4d_alloc_one(struct mm_struct *mm, unsigned long addr)
 {
 	if (pgtable_l5_enabled) {
@@ -128,6 +129,30 @@ static inline p4d_t *p4d_alloc_one(struct mm_struct *mm, unsigned long addr)
 
 	return NULL;
 }
+#else
+static inline p4d_t *p4d_alloc_one(struct mm_struct *mm, unsigned long addr)
+{
+        if (pgtable_l5_enabled) {
+                gfp_t gfp = __GFP_GENESIS;
+		p4d_t *p4d;
+
+                if (mm != &init_mm)
+                        gfp |= __GFP_ACCOUNT;
+
+		p4d = (p4d_t *)__get_free_page(gfp);
+                if (p4d) {
+                        _genesis_entry(/*svc_num*/ GENESIS_INIT_P4D,
+                                       /*arg0*/ (unsigned long)p4d,
+                                       /*arg1*/ 0);
+                }
+
+                return p4d;
+        }
+
+        return NULL;
+}
+#endif
+
 
 static inline void __p4d_free(struct mm_struct *mm, p4d_t *p4d)
 {
@@ -157,6 +182,7 @@ static inline void sync_kernel_mappings(pgd_t *pgd)
 	       (PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
 }
 
+#ifndef CONFIG_GENESIS
 static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 {
 	pgd_t *pgd;
@@ -169,6 +195,23 @@ static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 	}
 	return pgd;
 }
+#else
+static inline pgd_t *pgd_alloc(struct mm_struct *mm)
+{
+        pgd_t *pgd;
+
+        pgd = (pgd_t *)__get_free_page(__GFP_GENESIS);
+
+        if (likely(pgd != NULL)) {
+                _genesis_entry(/*svc_num*/ GENESIS_INIT_PGD,
+                               /*arg0*/ (unsigned long)pgd,
+                               /*arg1*/0);
+                /* Copy kernel mappings */
+                sync_kernel_mappings(pgd);
+        }
+        return pgd;
+}
+#endif
 
 #ifndef __PAGETABLE_PMD_FOLDED
 
