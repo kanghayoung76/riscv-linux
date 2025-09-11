@@ -39,6 +39,7 @@
 #include <asm/genesis.h>
 
 #include "../kernel/head.h"
+#define _PAGE_VALID   _AC(0x1,UL)
 
 u64 new_vmalloc[NR_CPUS / sizeof(u64) + 1];
 
@@ -480,6 +481,16 @@ static pud_t early_pud[PTRS_PER_PUD] __initdata __aligned(PAGE_SIZE);
 #define fixmap_pud     ((pud_t *)XIP_FIXUP(fixmap_pud))
 #define early_pud      ((pud_t *)XIP_FIXUP(early_pud))
 #endif /* CONFIG_XIP_KERNEL */
+
+//pgd_t dito_early_pg_dir[PTRS_PER_PGD] __initdata __aligned(PAGE_SIZE);
+//static pud_t dito_early_pud[PTRS_PER_PUD] __initdata __aligned(PAGE_SIZE);
+//static pmd_t dito_early_pmd[PTRS_PER_PMD] __initdata __aligned(PAGE_SIZE);
+/*
+#ifdef CONFIG_XIP_KERNEL
+#define dito_early_pg_dir   ((pgd_t *)XIP_FIXUP(dito_early_pg_dir))
+#define dito_early_pud      ((pud_t *)XIP_FIXUP(dito_early_pud))
+#define dito_early_pmd      ((pmd_t *)XIP_FIXUP(dito_early_pmd))
+#endif*/ /* CONFIG_XIP_KERNEL */
 
 static pmd_t *__init get_pmd_virt_early(phys_addr_t pa)
 {
@@ -1292,6 +1303,28 @@ asmlinkage void __init setup_vm(uintptr_t dtb_pa)
 	/* Setup early PGD for fixmap */
 	create_pgd_mapping(early_pg_dir, FIXADDR_START,
 			   fixmap_pgd_next, PGDIR_SIZE, PAGE_TABLE);
+	/*JADU*/
+	/*
+	memset(dito_early_pg_dir, 0, PAGE_SIZE);
+	//memset(dito_early_pud,    0, PAGE_SIZE);
+	memset(dito_early_pmd,    0, PAGE_SIZE);
+	pgprot_t prot;
+	prot.pgprot = _PAGE_READ | _PAGE_WRITE | _PAGE_VALID | _PAGE_USER | _PAGE_ACCESSED | _PAGE_DIRTY;
+
+	create_pgd_mapping(dito_early_pg_dir, 0xe0000000UL,
+                   (uintptr_t)dito_early_pmd,
+                   PGDIR_SIZE, PAGE_TABLE);
+	create_pmd_mapping(dito_early_pmd, 0xe0000000UL,
+                   0x100000000ULL,
+                   PMD_SIZE, PAGE_KERNEL_EXEC);
+	unsigned long hgatp = (HGATP_MODE_SV39X4 << HGATP_MODE_SHIFT) |
+                      ((__pa(dito_early_pg_dir) >> PAGE_SHIFT) & GENMASK(43,0));
+	csr_write(CSR_HGATP, hgatp);
+	csr_write(CSR_VSATP, 0);
+	asm volatile("hfence.gvma x0, x0" ::: "memory");
+	asm volatile("hfence.vvma x0, x0" ::: "memory");
+	*/
+
 
 #ifndef __PAGETABLE_PMD_FOLDED
 	/* Setup fixmap P4D and PUD */
@@ -1375,6 +1408,7 @@ static void __meminit create_linear_mapping_range(phys_addr_t start, phys_addr_t
 	phys_addr_t pa;
 	uintptr_t va, map_size;
 	uintptr_t shadow_va;
+	//map_size = PAGE_SIZE;
 
 	for (pa = start; pa < end; pa += map_size) {
 		va = (uintptr_t)__va(pa);

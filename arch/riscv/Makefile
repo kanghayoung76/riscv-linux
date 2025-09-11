@@ -70,7 +70,7 @@ riscv-march-$(CONFIG_ARCH_RV32I)	:= rv32ima
 riscv-march-$(CONFIG_ARCH_RV64I)	:= rv64ima
 riscv-march-$(CONFIG_FPU)		:= $(riscv-march-y)fd
 riscv-march-$(CONFIG_RISCV_ISA_C)	:= $(riscv-march-y)c
-riscv-march-$(CONFIG_RISCV_ISA_V)	:= $(riscv-march-y)v
+riscv-march-$(CONFIG_RISCV_ISA_V)	:= $(riscv-march-y)vh
 
 ifneq ($(CONFIG_RISCV_ISA_C),y)
 	KBUILD_RUSTFLAGS += -Ctarget-feature=-c

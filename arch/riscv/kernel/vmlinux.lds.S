@@ -27,9 +27,6 @@ ENTRY(_start)
 
 jiffies = jiffies_64;
 
-PECOFF_SECTION_ALIGNMENT = 0x1000;
-PECOFF_FILE_ALIGNMENT = 0x200;
-
 #ifdef CONFIG_GENESIS
 #define PRIVINST_TEXT                   \
         . = ALIGN(SECTION_ALIGN);       \
@@ -48,6 +45,7 @@ PECOFF_FILE_ALIGNMENT = 0x200;
 #define PRIVINST_TEXT
 #define GENESIS_TEXT
 #endif
+
 
 
 SECTIONS
