@@ -62,27 +62,11 @@ extern char __genesis_text_begin[], __genesis_text_end[];
 #endif
 
 /* HGATP decode helpers */
-static inline int hgatp_mode(void)
-{
-	return (csr_read(CSR_HGATP) >> HGATP_MODE_SHIFT) & 0xF;
-}
 static inline phys_addr_t hgatp_root_pa(void)
 {
 	unsigned long hgatp = csr_read(CSR_HGATP);
 	u64 ppn = hgatp & GENMASK_ULL(43, 0);  /* 44-bit PPN */
 	return (phys_addr_t)(ppn << PAGE_SHIFT);
-}
-
-/* x4 모드에서 루트 4페이지 중 은행 선택 */
-static inline unsigned gstage_bank(unsigned long gpa, int mode)
-{
-	/* Sv39x4 → GPA[41:40], Sv48x4 → GPA[53:52] */
-	return (mode == HGATP_MODE_SV39X4) ? ((gpa >> 40) & 3) : ((gpa >> 52) & 3);
-}
-static inline unsigned sstage_bank(unsigned long hva, int mode)
-{
-	/* Sv39x4 → GPA[41:40], Sv48x4 → GPA[53:52] */
-	return (mode == HGATP_MODE_SV39X4) ? ((hva >> 40) & 3) : ((hva >> 52) & 3);
 }
 
 /* 엔트리 공통 비트 프린트 */
@@ -129,107 +113,9 @@ static inline bool is_leaf(unsigned long e)
   return e & (_PAGE_READ | _PAGE_WRITE | _PAGE_EXEC);
 }
 
-/* ===== SATP 헬퍼 ===== */
-static inline phys_addr_t satp_root_pa(void)
-{
-  unsigned long satp = csr_read(CSR_SATP);
-  u64 ppn = satp & GENMASK_ULL(43, 0);      /* Sv48: PPN[43:0] */
-  return (phys_addr_t)(ppn << PAGE_SHIFT);
-}
-
-/* ===== Sv48(S-stage) KVA 워크 덤프: PGD→PUD→PMD→PTE, p4d 없음 ===== */
-void sstage_dump_walk_kva_sv48(unsigned long kva)
-{
-    /* 커널 전역 변수 satp_mode 와 함수 이름 충돌 피하기 위해 직접 CSR에서 모드 추출 */
-    unsigned long satp = csr_read(CSR_SATP);
-    int mode = (satp >> 60) & 0xF;           /* MODE[63:60] */
-    if (mode != 9) {                         /* 9 == Sv48 */
-        pr_err("[SSTAGE] SATP.MODE=%d (Sv48 아님)\n", mode);
-        return;
-    }
-
-    /* 루트 PA는 기존에 정의되어 있는 satp_root_pa() 재사용 */
-    phys_addr_t root_pa = satp_root_pa();
-    pgd_t *pgd = phys_to_virt(root_pa);
-
-    /* Sv48 인덱스 분해 (p4d 접힘) */
-    unsigned vpn3 = (kva >> 39) & 0x1FF; // PGD
-    unsigned vpn2 = (kva >> 30) & 0x1FF; // PUD
-    unsigned vpn1 = (kva >> 21) & 0x1FF; // PMD
-    unsigned vpn0 = (kva >> 12) & 0x1FF; // PTE
-
-    pr_info("[SSTAGE] Sv48 dump kva=%px root_pa=%pa va(root)=%px\n",
-            (void *)kva, &root_pa, pgd);
-
-    /* PGD */
-    unsigned long e3 = pgd_val(pgd[vpn3]);
-    pr_info(" PGD[%u] kva=%px ", vpn3, &pgd[vpn3]);
-    print_pte_bits("", e3);                  /* 이미 있는 출력 헬퍼 사용 */
-    if (!(e3 & _PAGE_VALID)) { pr_err("  PGD miss\n"); return; }
-    if (is_leaf(e3)) {
-        phys_addr_t mpa = leaf_map_pa(e3, kva, 3);   /* 512GiB leaf */
-        pr_info("  LEAF@PGD (512GiB) map_pa=%pa\n", &mpa);
-        return;
-    }
-
-    /* PUD table */
-    phys_addr_t pud_pa = next_table_pa(e3);
-    pud_t *pud = phys_to_virt(pud_pa);
-    pr_info(" PUD page: pa=%pa va=%px\n", &pud_pa, pud);
-
-    /* PUD */
-    unsigned long e2 = pud_val(pud[vpn2]);
-    pr_info(" PUD[%u] kva=%px ", vpn2, &pud[vpn2]);
-    print_pte_bits("", e2);
-    if (!(e2 & _PAGE_VALID)) { pr_err("  PUD miss\n"); return; }
-    if (is_leaf(e2)) {
-        phys_addr_t mpa = leaf_map_pa(e2, kva, 2);   /* 1GiB leaf */
-        pr_info("  LEAF@PUD (1GiB) map_pa=%pa\n", &mpa);
-        return;
-    }
-
-    /* PMD table */
-    phys_addr_t pmd_pa = next_table_pa(e2);
-    pmd_t *pmd = phys_to_virt(pmd_pa);
-    pr_info(" PMD page: pa=%pa va=%px\n", &pmd_pa, pmd);
-
-    /* PMD */
-    unsigned long e1 = pmd_val(pmd[vpn1]);
-    pr_info(" PMD[%u] kva=%px ", vpn1, &pmd[vpn1]);
-    print_pte_bits("", e1);
-    if (!(e1 & _PAGE_VALID)) { pr_err("  PMD miss\n"); return; }
-    if (is_leaf(e1)) {
-        phys_addr_t mpa = leaf_map_pa(e1, kva, 1);   /* 2MiB leaf */
-        pr_info("  LEAF@PMD (2MiB) map_pa=%pa\n", &mpa);
-        return;
-    }
-
-    /* PTE table */
-    phys_addr_t pte_pa = next_table_pa(e1);
-    pte_t *pt = phys_to_virt(pte_pa);
-    pr_info(" PTE page: pa=%pa va=%px\n", &pte_pa, pt);
-
-    /* PTE */
-    unsigned long e0 = pte_val(pt[vpn0]);
-    pr_info(" PTE[%u] kva=%px ", vpn0, &pt[vpn0]);
-    print_pte_bits("", e0);
-    if (!(e0 & _PAGE_VALID)) { pr_err("  PTE miss\n"); return; }
-    if (!is_leaf(e0))        { pr_err("  PTE not leaf\n"); return; }
-
-    phys_addr_t mpa = leaf_map_pa(e0, kva, 0);       /* 4KiB leaf */
-    pr_info("  LEAF@PTE (4KiB) map_pa=%pa\n", &mpa);
-}
-
 void gstage_dump_walk_gpa_sv48x4(unsigned long gpa)
 {
-  int mode = hgatp_mode();                   // 기대: 9 (Sv48x4)
-  if (mode != HGATP_MODE_SV48X4) {
-    pr_err("[GSTAGE] MODE=%d (Sv48x4 아님)\n", mode);
-    return;
-  }
   phys_addr_t root_pa = hgatp_root_pa();
-  //unsigned bank = gstage_bank(gpa, mode);
-  //phys_addr_t bank_root_pa = root_pa + (phys_addr_t)bank * PAGE_SIZE;
   pgd_t *pgd = phys_to_virt(root_pa);
 
   unsigned vpn3 = (gpa >> 39) & 0x1FF; // PGD
@@ -376,22 +262,18 @@ void __init genesis_test(void)
 	int *p5, *shadow_p5;
 
 	struct page *pgd_page;
-        pgd_page = alloc_pages(GFP_KERNEL | __GFP_ZERO,
-                                get_order(gstage_pgd_size));
+        pgd_page = alloc_pages(GFP_KERNEL | __GFP_ZERO, get_order(gstage_pgd_size));
 	pgd_t *gpgd = page_address(pgd_page);
 	unsigned long ppn = page_to_phys(pgd_page) >> PAGE_SHIFT;
 
 	unsigned long hgatp = (HGATP_MODE_SV48X4 << HGATP_MODE_SHIFT)
                     | (ppn & GENMASK_ULL(43, 0));  // 44b 마스크
 	csr_write(CSR_HGATP, hgatp);
-
 	csr_write(CSR_VSSTATUS, 0);
 	csr_write(CSR_VSATP, 0);
 
-	/* HGATP 쓴 직후와, 매핑 쓴 직후 모두 hfence.gvma */
 	asm volatile("hfence.gvma x0, x0" ::: "memory");
 	asm volatile("hfence.vvma x0, x0" ::: "memory");
-	asm volatile("sfence.vma x0, x0" ::: "memory");
 
 
 	pr_info("[GENESIS] TEST CODE START\n");
@@ -429,77 +311,6 @@ void __init genesis_test(void)
 	safe_hlv_d(&val, gpa);
 	pr_info("[DITO] HLV.D result : val=%#llx\n", val);
 	gstage_dump_walk_gpa_sv48x4(gpa);
-
-	/*
-	void *p3 = (void *)__get_free_page(GFP_KERNEL | GFP_DMA32 | __GFP_ZERO);
-	phys_addr_t pa = __pa(p3);
-	unsigned long gpa = 0x8000000000UL;
-
-	int mode = (csr_read(CSR_HGATP) >> HGATP_MODE_SHIFT) & 0xF;
-	unsigned bank = (mode == HGATP_MODE_SV39X4) ? ((gpa >> 40) & 3) : ((gpa >> 52) & 3);
-	pgd_t *gpgd_bank = (pgd_t *)((char *)gpgd + bank * PAGE_SIZE);
-	pgprot_t prot = __pgprot(0x0dfUL);
-	create_pgd_mapping(gpgd_bank, gpa, pa, PAGE_SIZE,
-                   prot);
-	asm volatile("hfence.gvma x0, x0" ::: "memory");
-	asm volatile("hfence.vvma x0, x0" ::: "memory");
-	asm volatile("sfence.vma x0, x0" ::: "memory");
-	pr_info("[DITO] pa=%#llx gpa=%#lx hva=%#lx\n", (unsigned long long)pa, gpa, (unsigned long long)p3);
-
-	*(u64 *)p3 = 0x111111111ULL;
-	u64 val = 0;
-	u32 val32 = 0;
-	unsigned long sc = csr_read(CSR_SCAUSE);
-	unsigned long sv = csr_read(CSR_STVAL);
-	unsigned long hv = csr_read(CSR_HTVAL);
-	unsigned long hs = csr_read(CSR_HSTATUS);
-	unsigned long vsatp = csr_read(CSR_VSATP);
-	unsigned long hg = csr_read(CSR_HGATP);
-	unsigned long satp = csr_read(CSR_SATP);
-	pr_info("[DITO] before HSV HLV fault: scause=%#lx stval=%#lx htval=%#lx hstatus=%#lx vsatp=%#lx hgatp=%#lx satp=%#lx\n", sc, sv, hv, hs, vsatp, hg, satp);
-	u64 data = 0xdeadbeefcafebabeULL;
-	if (safe_hsv_d(gpa, data))
-    		pr_err("HSV.D fault!\n");
-	else
-    		pr_info("HSV.D success\n");
-	sc = csr_read(CSR_SCAUSE);
-	sv = csr_read(CSR_STVAL);
-	hv = csr_read(CSR_HTVAL);
-	hs = csr_read(CSR_HSTATUS);
-	vsatp = csr_read(CSR_VSATP);
-	hg = csr_read(CSR_HGATP);
-	satp = csr_read(CSR_SATP);
-	pr_info("[DITO] after HSV fault: scause=%#lx stval=%#lx htval=%#lx hstatus=%#lx vsatp=%#lx hgatp=%#lx satp=%#lx\n", sc, sv, hv, hs, vsatp, hg, satp);
-	int rc = safe_hlv_d(&val, gpa);
-	if (rc)
-	    pr_err("HLV.D fault again: rc=%d gpa=%#lx (expect PTE above)\n", rc, gpa);
-	else
-	    pr_info("HLV.D OK: val=%#llx\n", val);
-	sc = csr_read(CSR_SCAUSE);
-	sv = csr_read(CSR_STVAL);
-	hv = csr_read(CSR_HTVAL);
-	hs = csr_read(CSR_HSTATUS);
-	vsatp = csr_read(CSR_VSATP);
-	hg = csr_read(CSR_HGATP);
-	satp = csr_read(CSR_SATP);
-	pr_info("[DITO] after HLV fault: scause=%#lx stval=%#lx htval=%#lx hstatus=%#lx vsatp=%#lx hgatp=%#lx satp=%#lx\n", sc, sv, hv, hs, vsatp, hg, satp);
-	rc = safe_hlvx_wu(&val32, gpa);
-        if (rc)
-            pr_err("HLV.D fault again: rc=%d gpa=%#lx (expect PTE above)\n", rc, gpa);
-        else
-            pr_info("HLV.D OK: val=%#llx\n", val);
-        sc = csr_read(CSR_SCAUSE);
-        sv = csr_read(CSR_STVAL);
-        hv = csr_read(CSR_HTVAL);
-        hs = csr_read(CSR_HSTATUS);
-        vsatp = csr_read(CSR_VSATP);
-        hg = csr_read(CSR_HGATP);
-        satp = csr_read(CSR_SATP);
-        pr_info("[DITO] after HLVX fault: scause=%#lx stval=%#lx htval=%#lx hstatus=%#lx vsatp=%#lx hgatp=%#lx satp=%#lx\n", sc, sv, hv, hs, vsatp, hg, satp);
-
-	sstage_dump_walk_kva_sv48((unsigned long)p3);
-	gstage_dump_walk_gpa_sv48x4(gpa);
-	*/
 }
 
 void __init genesis_zone_set_readonly(void)
