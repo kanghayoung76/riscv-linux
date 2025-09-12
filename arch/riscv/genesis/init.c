@@ -261,6 +261,7 @@ void __init genesis_test(void)
 	void *p, *p2;
 	int *p5, *shadow_p5;
 
+	/* go to mm/init.c
 	struct page *pgd_page;
         pgd_page = alloc_pages(GFP_KERNEL | __GFP_ZERO, get_order(gstage_pgd_size));
 	pgd_t *gpgd = page_address(pgd_page);
@@ -274,6 +275,7 @@ void __init genesis_test(void)
 
 	asm volatile("hfence.gvma x0, x0" ::: "memory");
 	asm volatile("hfence.vvma x0, x0" ::: "memory");
+	*/
 
 
 	pr_info("[GENESIS] TEST CODE START\n");
@@ -301,15 +303,27 @@ void __init genesis_test(void)
 	pr_info("[GENESIS] TEST CODE END\n");
 
 	pr_info("[DITO] GUEST ADDRESS SPACE TEST\n");
-	unsigned long gpa = 0x1000UL;
+	/* go to mm/init.c
 	int mode = (csr_read(CSR_HGATP) >> HGATP_MODE_SHIFT) & 0xF;
 	pgprot_t prot = __pgprot(0x0dfUL);
 	create_pgd_mapping(gpgd, gpa, 0x100000000, PUD_SIZE, prot);
+	*/
+	//csr_write(CSR_HGATP, 0x9000000000478804);
+	unsigned long gpa = 0x3920f3c0UL;
 	u64 data = 0x12345ULL;
-	u64 val = 0;
-	safe_hsv_d(gpa, data);
+	u64 val = 0x12345ULL;
+	//safe_hsv_d(gpa, data);
 	safe_hlv_d(&val, gpa);
-	pr_info("[DITO] HLV.D result : val=%#llx\n", val);
+	pr_info("[DITO] 0x3920f30 HLV.D result : val=%#llx\n", val);
+
+	gpa = 0x3920f3f0UL;
+	val = 0x12345ULL;
+	safe_hlv_d(&val, gpa);
+	pr_info("[DITO] 0x3920ff0 HLV.D result : val=%#llx\n", val);
+	pr_info("[DITO] hgatp = %#llx\n", csr_read(CSR_HGATP));
+    	unsigned long gp;
+    	asm volatile("mv %0, gp" : "=r"(gp));
+	pr_info("[DITO] gp = %#llx\n", gp);
 	gstage_dump_walk_gpa_sv48x4(gpa);
 }
 
