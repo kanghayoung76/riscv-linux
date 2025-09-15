@@ -1306,7 +1306,8 @@ asmlinkage void __init setup_vm(uintptr_t dtb_pa)
 	dito_early_pg_dir[0] = __pgd(0x11e201401);
 	dito_early_pud[0] = __pud(0x1100000df);
 
-	csr_write(CSR_HGATP, 0x9000000000478804);
+	//csr_write(CSR_HGATP, 0);
+	//csr_write(CSR_HGATP, 0x9000000000478804);
 	csr_write(CSR_VSSTATUS, 0);
 	csr_write(CSR_VSATP, 0);
 
