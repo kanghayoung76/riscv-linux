@@ -1484,7 +1484,7 @@ static void __init setup_vm_final(void)
         memblock_set_current_limit(MEMBLOCK_ALLOC_ANYWHERE);
 	pr_info("[DITO] dito_early_pg_dir pa : 0x%lx\n", __pa(dito_early_pg_dir));
 	pr_info("[DITO] dito_early_pud pa : 0x%lx\n", __pa(dito_early_pud));
-	pr_info("[DITO] init_shadow_call_stack pa : 0x%lx\n", __pa_symbol(init_shadow_call_stack));
+	pr_info("[DITO] init_shadow_call_stack pa : 0x%lx, va : 0x%lx\n", __pa_symbol(init_shadow_call_stack), init_shadow_call_stack);
 	pr_info("[DITO] satp : 0x%lx\n", csr_read(CSR_SATP));
 	pr_info("[DITO] hgatp : 0x%lx\n", csr_read(CSR_HGATP));
 #endif

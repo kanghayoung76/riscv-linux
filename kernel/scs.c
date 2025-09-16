@@ -67,6 +67,7 @@ void *scs_alloc(int node)
 	 */
 	kasan_poison_vmalloc(s, SCS_SIZE);
 	__scs_account(s, 1);
+	//pr_info("[DITO] -------------------------- scs_alloc address : 0x%lx\n",(unsigned long)s);
 	return s;
 }
 
@@ -161,8 +162,8 @@ void scs_release(struct task_struct *tsk)
 	if (!scs_is_enabled() || !s)
 		return;
 
-	WARN(task_scs_end_corrupted(tsk),
-	     "corrupted shadow stack detected when freeing task\n");
-	scs_check_usage(tsk);
+	//WARN(task_scs_end_corrupted(tsk),
+	//     "corrupted shadow stack detected when freeing task\n");
+	//scs_check_usage(tsk);
 	scs_free(s);
 }

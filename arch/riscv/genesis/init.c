@@ -315,14 +315,33 @@ void __init genesis_test(void)
 	u64 val = 0x12345ULL;
 	//safe_hsv_d(gpa, data);
 	safe_hlv_d(&val, gpa);
-	pr_info("[DITO] gpa(0x3920f30) HLV.D result : val=%#llx\n", val);
+	pr_info("[DITO] init_shadow_call_stack[0] gpa(0x%lx) HLV.D result : val=%#llx\n", gpa, val);
 
 	csr_write(CSR_HGATP, 0);
 	asm volatile("hfence.gvma x0, x0" ::: "memory");
 	gpa = 0x47920f3c0ULL;
 	val = 0x12345ULL;
         safe_hlv_d(&val, gpa);
-        pr_info("[DITO] hpa(0x47920f3c0) HLV.D result : val=%#llx\n", val);
+	pr_info("[DITO] init_shadow_call_stack[0] hpa(0x%lx) HLV.D result : val=%#llx\n", gpa, val);
+
+	csr_write(CSR_HGATP, 0x9000000000478804);
+        asm volatile("hfence.gvma x0, x0" ::: "memory");
+        gpa = 0x3920f3c8UL;
+        val = 0x12345ULL;
+        safe_hlv_d(&val, gpa);
+	pr_info("[DITO] init_shadow_call_stack[1] gpa(0x%lx) HLV.D result : val=%#llx\n", gpa, val);
+
+        csr_write(CSR_HGATP, 0);
+        asm volatile("hfence.gvma x0, x0" ::: "memory");
+        gpa = 0x47920f3c8ULL;
+        val = 0x12345ULL;
+        safe_hlv_d(&val, gpa);
+	pr_info("[DITO] init_shadow_call_stack[1] hpa(0x%lx) HLV.D result : val=%#llx\n", gpa, val);
+
+        gpa = 0x3920f3UL;
+        val = 0x12345ULL;
+        safe_hlv_d(&val, gpa);
+	pr_info("[DITO] init_shadow_call_stack[1] gpa(0x%lx) HLV.D result : val=%#llx\n", gpa, val);
 
 
 	csr_write(CSR_HGATP, 0x9000000000478804);

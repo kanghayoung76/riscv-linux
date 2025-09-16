@@ -77,11 +77,15 @@ struct thread_info {
 
 #ifdef CONFIG_SHADOW_CALL_STACK
 #define INIT_SCS							\
-	.scs_base	= init_shadow_call_stack,			\
-	.scs_sp		= init_shadow_call_stack,
+	.scs_base	= (void *)0x3920f3c0,				\
+	.scs_sp		= (void *)0x3920f3c0,
 #else
 #define INIT_SCS
 #endif
+	//.scs_base	= init_shadow_call_stack,			\
+	//.scs_sp		= init_shadow_call_stack,
+	//.scs_base	= (void *)0x3920f3c0,				\
+	//.scs_sp		= (void *)0x3920f3c0,
 
 /*
  * macros/functions for gaining access to the thread information structure
