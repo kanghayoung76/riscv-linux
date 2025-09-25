@@ -1670,6 +1670,7 @@ EXPORT_SYMBOL(drm_atomic_helper_wait_for_fences);
  * drm_atomic_helper_setup_commit() should look at
  * drm_atomic_helper_wait_for_flip_done() as an alternative.
  */
+
 void
 drm_atomic_helper_wait_for_vblanks(struct drm_device *dev,
 		struct drm_atomic_state *old_state)
@@ -1707,6 +1708,7 @@ drm_atomic_helper_wait_for_vblanks(struct drm_device *dev,
 					drm_crtc_vblank_count(crtc),
 				msecs_to_jiffies(100));
 
+		/*JADU*/
 		WARN(!ret, "[CRTC:%d:%s] vblank wait timed out\n",
 		     crtc->base.id, crtc->name);
 

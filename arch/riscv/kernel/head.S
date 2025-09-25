@@ -107,8 +107,13 @@ relocate_enable_mmu:
 .align 2
 1:
 	/*JADU*/
-	li      t0, 0x9000000000478804
+	li      t0, 0x9000000000479ac0
+	li      t0, 0x90000000004796c4
 	csrw CSR_HGATP, t0
+	li      t0, 0x0
+	csrw CSR_VSATP, t0
+	li      t0, 0x200000000
+	csrw CSR_VSSTATUS, t0
 	/* Set trap vector to spin forever to help debug */
 	la a0, .Lsecondary_park
 	csrw CSR_TVEC, a0

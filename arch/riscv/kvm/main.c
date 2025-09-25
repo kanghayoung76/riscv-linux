@@ -51,6 +51,7 @@ void kvm_arch_disable_virtualization_cpu(void)
 	csr_write(CSR_HIDELEG, 0);
 }
 
+
 static int __init riscv_kvm_init(void)
 {
 	int rc;

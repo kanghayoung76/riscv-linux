@@ -84,8 +84,10 @@ struct thread_info {
 #endif
 	//.scs_base	= init_shadow_call_stack,			\
 	//.scs_sp		= init_shadow_call_stack,
-	//.scs_base	= (void *)0x3920f3c0,				\
+	//.scs_base	= (void *)0x3920f3c0,				\ //on genesis
 	//.scs_sp		= (void *)0x3920f3c0,
+	//.scs_base	= (void *)0x3960f3c0,				\ //not genesis
+	//.scs_sp		= (void *)0x3960f3c0,			  
 
 /*
  * macros/functions for gaining access to the thread information structure

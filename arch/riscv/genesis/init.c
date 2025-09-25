@@ -164,6 +164,59 @@ void gstage_dump_walk_gpa_sv48x4(unsigned long gpa)
   pr_info("  LEAF@PTE (4KiB)\n");
 }
 
+void sstage_dump_walk_kva_sv48x4(unsigned long gpa)
+{
+  phys_addr_t root_pa = csr_read(CSR_SATP) & 0xffffff;
+  root_pa = root_pa << PAGE_SHIFT;
+  pgd_t *pgd = phys_to_virt(root_pa);
+
+  unsigned vpn3 = (gpa >> 39) & 0x1FF; // PGD
+  unsigned vpn2 = (gpa >> 30) & 0x1FF; // PUD
+  unsigned vpn1 = (gpa >> 21) & 0x1FF; // PMD
+  unsigned vpn0 = (gpa >> 12) & 0x1FF; // PTE
+
+  pr_info("[SSTAGE] Sv48x4 dump kva=%#lx root_pa=%pa va=%px\n",
+          gpa, &root_pa, pgd);
+
+  /* PGD */
+  unsigned long e3 = pgd_val(pgd[vpn3]);
+  pr_info(" PGD[%u] kva=%px ", vpn3, &pgd[vpn3]); print_pte_bits("", e3);
+  if (!(e3 & _PAGE_VALID)) { pr_err("  PGD miss\n"); return; }
+  if (is_leaf(e3)) { pr_err("  PGD leaf는 비정상(512GiB)\n"); return; }
+
+  /* PUD table */
+  pud_t *pud = phys_to_virt(next_table_pa(e3));
+  pr_info(" PUD page: pa=%pa va=%px\n", (phys_addr_t[]){ next_table_pa(e3) }, pud);
+
+  /* PUD */
+  unsigned long e2 = pud_val(pud[vpn2]);
+  pr_info(" PUD[%u] kva=%px ", vpn2, &pud[vpn2]); print_pte_bits("", e2);
+  if (!(e2 & _PAGE_VALID)) { pr_err("  PUD miss\n"); return; }
+  if (is_leaf(e2)) { pr_info("  LEAF@PUD (1GiB)\n"); return; } // 의도치 않으면 버그
+
+  /* PMD table */
+  pmd_t *pmd = phys_to_virt(next_table_pa(e2));
+  pr_info(" PMD page: pa=%pa va=%px\n", (phys_addr_t[]){ next_table_pa(e2) }, pmd);
+
+  /* PMD */
+  unsigned long e1 = pmd_val(pmd[vpn1]);
+  pr_info(" PMD[%u] kva=%px ", vpn1, &pmd[vpn1]); print_pte_bits("", e1);
+  if (!(e1 & _PAGE_VALID)) { pr_err("  PMD miss\n"); return; }
+  if (is_leaf(e1)) { pr_info("  LEAF@PMD (2MiB)\n"); return; } // 2MiB 의도면 여기서 끝
+
+  /* PTE table */
+  pte_t *pt = phys_to_virt(next_table_pa(e1));
+  pr_info(" PTE page: pa=%pa va=%px\n", (phys_addr_t[]){ next_table_pa(e1) }, pt);
+
+  /* PTE */
+  unsigned long e0 = pte_val(pt[vpn0]);
+  pr_info(" PTE[%u] kva=%px ", vpn0, &pt[vpn0]); print_pte_bits("", e0);
+  if (!(e0 & _PAGE_VALID)) { pr_err("  PTE miss\n"); return; }
+  if (!is_leaf(e0)) { pr_err("  PTE not leaf\n"); return; }
+  pr_info("  LEAF@PTE (4KiB)\n");
+}
+
+
 static __always_inline int safe_hlvx_wu(u32 *out, unsigned long gpa)
 {
     unsigned long val;
@@ -303,12 +356,14 @@ void __init genesis_test(void)
 	pr_info("[GENESIS] TEST CODE END\n");
 
 	pr_info("[DITO] GUEST ADDRESS SPACE TEST\n");
+
 	/* go to mm/init.c
 	int mode = (csr_read(CSR_HGATP) >> HGATP_MODE_SHIFT) & 0xF;
 	pgprot_t prot = __pgprot(0x0dfUL);
-	create_pgd_mapping(gpgd, gpa, 0x100000000, PUD_SIZE, prot);
+	create_pgd_mapping((pgd_t *)phys_to_virt(0x478804000), 0xc0000000, 0x100000000, PUD_SIZE, prot);
 	*/
-	//csr_write(CSR_HGATP, 0x9000000000478804);
+
+	/*
 	asm volatile("hfence.gvma x0, x0" ::: "memory");
 	unsigned long gpa = 0x3920f3c0UL;
 	u64 data = 0x12345ULL;
@@ -317,44 +372,50 @@ void __init genesis_test(void)
 	safe_hlv_d(&val, gpa);
 	pr_info("[DITO] init_shadow_call_stack[0] gpa(0x%lx) HLV.D result : val=%#llx\n", gpa, val);
 
-	csr_write(CSR_HGATP, 0);
-	asm volatile("hfence.gvma x0, x0" ::: "memory");
-	gpa = 0x47920f3c0ULL;
-	val = 0x12345ULL;
-        safe_hlv_d(&val, gpa);
-	pr_info("[DITO] init_shadow_call_stack[0] hpa(0x%lx) HLV.D result : val=%#llx\n", gpa, val);
-
-	csr_write(CSR_HGATP, 0x9000000000478804);
-        asm volatile("hfence.gvma x0, x0" ::: "memory");
         gpa = 0x3920f3c8UL;
         val = 0x12345ULL;
         safe_hlv_d(&val, gpa);
 	pr_info("[DITO] init_shadow_call_stack[1] gpa(0x%lx) HLV.D result : val=%#llx\n", gpa, val);
 
         csr_write(CSR_HGATP, 0);
-        asm volatile("hfence.gvma x0, x0" ::: "memory");
         gpa = 0x47920f3c8ULL;
         val = 0x12345ULL;
         safe_hlv_d(&val, gpa);
 	pr_info("[DITO] init_shadow_call_stack[1] hpa(0x%lx) HLV.D result : val=%#llx\n", gpa, val);
 
-        gpa = 0x3920f3UL;
+        gpa = 0x100000000ULL;
         val = 0x12345ULL;
         safe_hlv_d(&val, gpa);
-	pr_info("[DITO] init_shadow_call_stack[1] gpa(0x%lx) HLV.D result : val=%#llx\n", gpa, val);
+	pr_info("[DITO] scs page hpa(0x%lx) HLV.D result : val=%#llx\n", gpa, val);
 
+        gpa = 0x100004000ULL;
+        val = 0x12345ULL;
+        safe_hlv_d(&val, gpa);
+	pr_info("[DITO] scs page hpa(0x%lx) HLV.D result : val=%#llx\n", gpa, val);
 
-	csr_write(CSR_HGATP, 0x9000000000478804);
-	asm volatile("hfence.gvma x0, x0" ::: "memory");
-	gpa = 0x3920f3f0UL;
+        gpa = 0x100004008ULL;
+        val = 0x12345ULL;
+        safe_hlv_d(&val, gpa);
+	pr_info("[DITO] scs page hpa(0x%lx) HLV.D result : val=%#llx\n", gpa, val);
+	*/
+
+	/*
+	gpa = 0xc0000000UL;
 	val = 0x12345ULL;
 	safe_hlv_d(&val, gpa);
-	pr_info("[DITO] 0x3920ff0 HLV.D result : val=%#llx\n", val);
+	safe_hsv_d(gpa, val);
+	pr_info("[DITO] scs page gpa(0x%lx) HLV.D result : val=%#llx\n", gpa, val);
 	pr_info("[DITO] hgatp = %#llx\n", csr_read(CSR_HGATP));
     	unsigned long gp;
     	asm volatile("mv %0, gp" : "=r"(gp));
 	pr_info("[DITO] gp = %#llx\n", gp);
+	pr_info("[DITO] hgatp : 0x%lx\n",csr_read(CSR_HGATP));
+	pr_info("[DITO] vsatp : 0x%lx\n",csr_read(CSR_VSATP));
+	pr_info("[DITO] vsstatus : 0x%lx\n",csr_read(CSR_VSSTATUS));
 	gstage_dump_walk_gpa_sv48x4(gpa);
+	gpa = 0xffffaf80e0004038;
+	sstage_dump_walk_kva_sv48x4(gpa);
+	*/
 }
 
 void __init genesis_zone_set_readonly(void)

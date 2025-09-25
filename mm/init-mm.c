@@ -50,6 +50,12 @@ struct mm_struct init_mm = {
 void setup_initial_init_mm(void *start_code, void *end_code,
 			   void *end_data, void *brk)
 {
+	/*JADU*/
+	pr_info("[DITO] hgatp : 0x%lx\n",csr_read(CSR_HGATP));
+        unsigned long gp;
+        asm volatile("mv %0, gp" : "=r"(gp));
+        pr_info("[DITO] gp = %#llx\n", gp);
+
 	init_mm.start_code = (unsigned long)start_code;
 	init_mm.end_code = (unsigned long)end_code;
 	init_mm.end_data = (unsigned long)end_data;

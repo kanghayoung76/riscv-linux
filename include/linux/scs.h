@@ -47,10 +47,10 @@ static inline unsigned long *__scs_magic(void *s)
 
 static inline bool task_scs_end_corrupted(struct task_struct *tsk)
 {
-	unsigned long *magic = __scs_magic(task_scs(tsk));
+	//unsigned long *magic = __scs_magic(task_scs(tsk));
 	unsigned long sz = task_scs_sp(tsk) - task_scs(tsk);
 
-	return sz >= SCS_SIZE - 1 || READ_ONCE_NOCHECK(*magic) != SCS_END_MAGIC;
+	return sz >= SCS_SIZE - 1;// || READ_ONCE_NOCHECK(*magic) != SCS_END_MAGIC;
 }
 
 DECLARE_STATIC_KEY_FALSE(dynamic_scs_enabled);

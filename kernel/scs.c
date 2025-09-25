@@ -38,14 +38,17 @@ static void *__scs_alloc(int node)
 		if (s) {
 			s = kasan_unpoison_vmalloc(s, SCS_SIZE,
 						   KASAN_VMALLOC_PROT_NORMAL);
-			memset(s, 0, SCS_SIZE);
+			//memset(s, 0, SCS_SIZE);
 			goto out;
 		}
 	}
 
+	/*
 	s = __vmalloc_node_range(SCS_SIZE, 1, VMALLOC_START, VMALLOC_END,
 				    GFP_SCS, PAGE_KERNEL, 0, node,
 				    __builtin_return_address(0));
+				    */
+	s = (void *)__get_free_page(__GFP_DITO);
 
 out:
 	return kasan_reset_tag(s);
@@ -59,6 +62,8 @@ void *scs_alloc(int node)
 	if (!s)
 		return NULL;
 
+	s = (void *)((((uintptr_t)0xffffaf80eULL) << 28) |
+             ((uintptr_t)s & 0xfffffffULL));
 	*__scs_magic(s) = SCS_END_MAGIC;
 
 	/*
@@ -67,7 +72,9 @@ void *scs_alloc(int node)
 	 */
 	kasan_poison_vmalloc(s, SCS_SIZE);
 	__scs_account(s, 1);
-	//pr_info("[DITO] -------------------------- scs_alloc address : 0x%lx\n",(unsigned long)s);
+	//pr_info("before s : 0x%lx\n",(unsigned long)s);
+	s = (void *)((uintptr_t)s & 0xcfffffffUL);
+	//pr_info("after s : 0x%lx\n",(unsigned long)s);
 	return s;
 }
 
@@ -86,9 +93,11 @@ void scs_free(void *s)
 	for (i = 0; i < NR_CACHED_SCS; i++)
 		if (this_cpu_cmpxchg(scs_cache[i], 0, s) == NULL)
 			return;
-
 	kasan_unpoison_vmalloc(s, SCS_SIZE, KASAN_VMALLOC_PROT_NORMAL);
-	vfree_atomic(s);
+	//vfree_atomic(s);
+	s = (void *)((((uintptr_t)0xffffaf80eULL) << 28) |
+             ((uintptr_t)s & 0xffffffffULL));
+	free_page((unsigned long)s);
 }
 
 static int scs_cleanup(unsigned int cpu)
@@ -97,7 +106,8 @@ static int scs_cleanup(unsigned int cpu)
 	void **cache = per_cpu_ptr(scs_cache, cpu);
 
 	for (i = 0; i < NR_CACHED_SCS; i++) {
-		vfree(cache[i]);
+		//vfree(cache[i]);
+		free_page((unsigned long)cache[i]);
 		cache[i] = NULL;
 	}
 
@@ -124,6 +134,7 @@ int scs_prepare(struct task_struct *tsk, int node)
 		return -ENOMEM;
 
 	task_scs(tsk) = task_scs_sp(tsk) = s;
+//	pr_info("[DITO] ------- s = 0x%llx\n",(unsigned long long)s);
 	return 0;
 }
 
@@ -162,8 +173,8 @@ void scs_release(struct task_struct *tsk)
 	if (!scs_is_enabled() || !s)
 		return;
 
-	//WARN(task_scs_end_corrupted(tsk),
-	//     "corrupted shadow stack detected when freeing task\n");
-	//scs_check_usage(tsk);
+	WARN(task_scs_end_corrupted(tsk),
+	     "corrupted shadow stack detected when freeing task\n");
+	scs_check_usage(tsk);
 	scs_free(s);
 }

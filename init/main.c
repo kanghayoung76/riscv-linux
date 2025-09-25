@@ -1117,6 +1117,7 @@ void start_kernel(void)
 #if !__has_attribute(__no_stack_protector__)
 	prevent_tail_call_optimization();
 #endif
+
 }
 
 /* Call all constructor functions linked into the kernel. */

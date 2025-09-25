@@ -14,12 +14,6 @@
 void __init soc_early_init(void)
 {
 
-        unsigned long gp, ra;
-        asm volatile("mv %0, gp" : "=r"(gp));
-        asm volatile("mv %0, ra" : "=r"(ra));
-        pr_info("[DITO] gp = %#llx, ra = %#llx, hgatp = %#llx\n", gp, ra, csr_read(CSR_HGATP));
-
-	pr_info("[DITO] -------------\n");
 	void (*early_fn)(const void *fdt);
 	const struct of_device_id *s;
 	const void *fdt = dtb_early_va;
